@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEditor;
 
 public class Brush : MonoBehaviour {
 
@@ -8,16 +9,28 @@ public class Brush : MonoBehaviour {
     public Color CurrentColor = Color.white;
     public SpriteRenderer CurrentSpriteRenderer = new SpriteRenderer();
 
+    public Vector3 MousePos;
+
     public void OnDrawGizmosSelected()
     {
-        Gizmos.color = CurrentColor;//Should be the color of the selected object
-        Gizmos.DrawWireCube(transform.position, BrushSize);
-        Debug.Log("Drawing Brush Cube");
+        DrawBrushOutline();
     }
 
-    public void Start()
+    public void OnDrawGizmos()
     {
-        CurrentSpriteRenderer.sprite = new Sprite();
+        DrawBrushOutline();
+    } 
+    //private void OnSceneGUI()
+    //{
+    //    //mosPos = Input.mousePosition;
+    //    MousePos = Event.current.mousePosition;
+    //}
+
+    public void DrawBrushOutline()
+    {
+        Gizmos.color = CurrentColor;//Should be the color of the selected object
+        Gizmos.DrawWireCube(MousePos, BrushSize);
+        Debug.Log("Drawing Brush Cube: " + MousePos);
     }
 
     public void UpdateBrush(Sprite sprite)

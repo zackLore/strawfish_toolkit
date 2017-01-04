@@ -7,6 +7,7 @@ using UnityEditor;
 public class ImgEditor : Editor {
 
     public ImageEditor ie;
+    public Brush brush;
 
     public override void OnInspectorGUI()
     {
@@ -37,13 +38,50 @@ public class ImgEditor : Editor {
         EditorGUILayout.EndVertical();
     }
 
+    //https://forum.unity3d.com/threads/how-to-get-mouseposition-in-scene-view.208911/
+    private void OnSceneGUI()
+    {
+        if (ie != null)
+        {
+            if (brush == null)
+            {
+                brush = ie.GetComponentInChildren<Brush>();
+            }
+
+            if (brush != null)
+            {
+                var pos = Event.current.mousePosition;
+                pos.y = SceneView.currentDrawingSceneView.camera.pixelHeight - pos.y;
+                pos = SceneView.currentDrawingSceneView.camera.ScreenToWorldPoint(pos);
+                pos.y = -pos.y;
+
+                if (pos != null)
+                {
+                    brush.MousePos = pos;
+                    //brush.OnDrawGizmos();
+                }
+            }
+        }
+    }
+
     public void OnEnable()
     {
         ie = target as ImageEditor;
         Tools.current = Tool.View;//Re-enables the tool view
 
-        //Camera.main.ScreenToWorldPoint(ie.transform.position);
+        FocusCamera();
+
         ie.NewBrush();
+    }
+
+    public void FocusCamera()
+    {
+        Vector3 pos = ie.transform.position;
+        pos.x = pos.x + (ie.ImageSize / 2);
+        pos.y = pos.y + (ie.ImageSize / 2);
+        
+        SceneView.lastActiveSceneView.pivot = pos;
+        SceneView.lastActiveSceneView.Repaint();        
     }
 
     //public void OnDisable()

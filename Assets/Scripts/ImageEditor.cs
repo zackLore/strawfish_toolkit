@@ -23,7 +23,6 @@ public class ImageEditor : MonoBehaviour {
             }
         }
     }
-    public Texture2D CurrentTexture { get; set; }
 
     private int _imageSize;
     public int ImageSize
@@ -66,14 +65,13 @@ public class ImageEditor : MonoBehaviour {
         }
     }
 
-    public Sprite[][] BitmapArray;
-    public Sprite CurrentPixel;
+    public Texture2D[][] BitmapArray;
+    public Texture2D CurrentPixel;
 
     public Brush brush { get; set; }
 
 	// Use this for initialization
-	void Start () {
-        CurrentTexture = new Texture2D(BrushSize, BrushSize);
+	void Start () {        
 	}
 	
 	// Update is called once per frame
@@ -133,13 +131,13 @@ public class ImageEditor : MonoBehaviour {
             CreateBrush();
         }
     }
-
+    
     public void InitializeBitmapArray()
     {
-        BitmapArray = new Sprite[ImageSize][];
+        BitmapArray = new Texture2D[ImageSize][];
         for (int i = 0; i < BitmapArray.Length; i++)
         {
-            BitmapArray[i] = new Sprite[ImageSize];
+            BitmapArray[i] = new Texture2D[ImageSize];
         }
     }
 }
