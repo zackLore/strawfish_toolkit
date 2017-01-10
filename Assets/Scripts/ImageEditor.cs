@@ -81,27 +81,27 @@ public class ImageEditor : MonoBehaviour {
 
     public void OnDrawGizmosSelected()
     {
-        if (ImageSize == 0) { return; }
-        var pos = transform.position;
+        //if (ImageSize == 0) { return; }
+        //var pos = transform.position;
 
-        //Draw Grid
-        Gizmos.color = Color.gray;
-        //int max = ImageSize * ImageSize;
+        ////Draw Grid
+        //Gizmos.color = Color.gray;
+        ////int max = ImageSize * ImageSize;
 
-        for (int i = 0; i < ImageSize; i++)
-        {
-            for (int j = 0; j < ImageSize; j++)
-            {
-                Gizmos.DrawWireCube(new Vector3(i + .5f, j + .5f), new Vector3(1, 1));
-            }
-        }
+        //for (int i = 0; i < ImageSize; i++)
+        //{
+        //    for (int j = 0; j < ImageSize; j++)
+        //    {
+        //        Gizmos.DrawWireCube(new Vector3(i + .5f, j + .5f), new Vector3(1, 1));
+        //    }
+        //}
 
-        //Draw Border
-        Gizmos.color = Color.white;
-        var centerX = pos.x + (ImageSize / 2);
-        var centerY = pos.y + (ImageSize / 2);
+        ////Draw Border
+        //Gizmos.color = Color.white;
+        //var centerX = pos.x + (ImageSize / 2);
+        //var centerY = pos.y + (ImageSize / 2);
 
-        Gizmos.DrawWireCube(new Vector2(centerX, centerY), new Vector3(ImageSize, ImageSize));
+        //Gizmos.DrawWireCube(new Vector2(centerX, centerY), new Vector3(ImageSize, ImageSize));
     }
 
     public void CreateBrush()

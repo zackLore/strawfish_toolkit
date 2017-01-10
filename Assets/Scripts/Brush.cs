@@ -13,12 +13,12 @@ public class Brush : MonoBehaviour {
 
     public void OnDrawGizmosSelected()
     {
-        DrawBrushOutline();
+        //DrawBrushOutline();
     }
 
     public void OnDrawGizmos()
     {
-        DrawBrushOutline();
+        //DrawBrushOutline();
     } 
     //private void OnSceneGUI()
     //{
@@ -28,9 +28,9 @@ public class Brush : MonoBehaviour {
 
     public void DrawBrushOutline()
     {
-        Gizmos.color = CurrentColor;//Should be the color of the selected object
-        Gizmos.DrawWireCube(MousePos, BrushSize);
-        Debug.Log("Drawing Brush Cube: " + MousePos);
+        //Gizmos.color = CurrentColor;//Should be the color of the selected object
+        //Gizmos.DrawWireCube(MousePos, BrushSize);
+        //Debug.Log("Drawing Brush Cube: " + MousePos);
     }
 
     public void UpdateBrush(Sprite sprite)
