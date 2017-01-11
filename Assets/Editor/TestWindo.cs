@@ -12,11 +12,11 @@ public class TestWindo : EditorWindow {
         window.titleContent = title;
     }
 
-    Color CurrentColor;
-    Rect[] pixels;
-    Color[] colors;
+    Rect BrushRect;    
+    Color[] Colors;
     Texture2D CurrentImage = null;
     Rect ImageArea;
+    Vector3 MousePos = new Vector3(0, 0);
 
     #region BrushSize
     private int _brushSize;
@@ -30,7 +30,34 @@ public class TestWindo : EditorWindow {
         {
             if (value != _brushSize)
             {
-                _brushSize = value * (ZoomSize > 0 ? ZoomSize : 1);
+                _brushSize = value;
+                UpdatePixelColorArray();
+            }
+        }
+    }
+    #endregion
+
+    #region CurrentColor
+    private Color _currentColor;
+    public Color CurrentColor
+    {
+        get
+        {
+            if (_currentColor == null)
+            {
+                _currentColor = new Color();
+            }
+            return _currentColor;
+        }
+        set
+        {
+            if (value != _currentColor)
+            {
+                _currentColor = value;
+                if (_currentColor != null)
+                {
+                    UpdatePixelColorArray();
+                }
             }
         }
     }
@@ -74,6 +101,18 @@ public class TestWindo : EditorWindow {
     }
     #endregion
 
+    #region ZoomedBrushSize
+    private int _zoomedBrushSize;
+    public int ZoomedBrushSize
+    {
+        get
+        {
+            _zoomedBrushSize = BrushSize * (ZoomSize > 0 ? ZoomSize : 1);
+            return _zoomedBrushSize;
+        }
+    }
+    #endregion
+
     int adjustedSize = 0;
     int col = 0;
     int row = 0;
@@ -81,75 +120,115 @@ public class TestWindo : EditorWindow {
 
     private void OnEnable()
     {
-        //adjustedSize = 32 * 4;
-        //pixels = new Rect[24 * 24];
-        //colors = new Color[pixels.Length];
-
         ZoomSize = 4;
         CurrentColor = new Color(0, 0, 0);
-        UpdateImageSize();        
+        ImageSize = 32;
+        BrushSize = 1;
+        UpdateImageSize(new Texture2D(1,1));
+        BrushRect = new Rect(0, 0, 1, 1);      
     }
 
     private void OnGUI()
     {
         ImageSize = EditorGUILayout.IntField("Image Size: ", ImageSize);
         BrushSize = EditorGUILayout.IntField("Brush Size: ", BrushSize);
-        //adjustedSize = ImageSize * BrushSize;
 
-        Vector3 MousePos = GUIUtility.GUIToScreenPoint(Event.current.mousePosition);
-        //GUI.Box(ImageArea, GUIContent.none);
+        MousePos = GUIUtility.GUIToScreenPoint(Event.current.mousePosition);
         EditorGUI.DrawPreviewTexture(ImageArea, CurrentImage);
 
         CurrentColor = EditorGUILayout.ColorField("Color: ", CurrentColor, null);
-        EditorGUI.DrawRect(new Rect(MousePos.x, MousePos.y - position.y, BrushSize, BrushSize), CurrentColor);
+        BrushRect = new Rect(MousePos.x, MousePos.y - position.y, ZoomedBrushSize, ZoomedBrushSize);
 
-        //CurrentImage.SetPixel(0, 0, Color.red);
+        if (!Cursor.visible)
+        {
+            EditorGUI.DrawRect(BrushRect, CurrentColor);
+        }
         
         if (Event.current.type == EventType.MouseDown)//detect mousedown event
         {
-            //int col = (int)((MousePos.x - position.x) - 100) % adustedSize;
-            //int row = (int)((MousePos.y - position.y) - 100) % adustedSize;
-
-            //row = row / 4;
-            //col = col / 4;
-
-            //int col = (int)((MousePos.x - position.x) - 100) % 32;
-            //int col = (int)MousePos.x - 100;
-            //int row = (int)((MousePos.y - position.y) - 100) % 32;
-
-            //int entry = (row * 24) + col;
-            //if (entry <= pixels.Length)
-            //{
-            Debug.Log("MousePos: " + MousePos);
-            //pixels[entry] = new Rect(MousePos.x, MousePos.y, 4, 4);
-            //colors[entry] = new Color(currentColor.r, currentColor.g, currentColor.b, currentColor.a);
-            //EditorGUI.DrawRect(pixels[entry], colors[entry]);
-
-            //CurrentImage.SetPixel(col, CurrentImage.height - row, currentColor);
             int x = (int)MousePos.x - positionBuffer;
             int y = (int)(MousePos.y - (-MousePos.y)) - positionBuffer;
-            CurrentImage.SetPixel((int)MousePos.x - positionBuffer, (int)MousePos.y - positionBuffer, CurrentColor);
+            
+            x = x >= 0 ? x : 0;
 
-            //CurrentImage.SetPixels(col, row, 4, 0, new Color[3] { Color.blue, Color.red, Color.white });
+            //adjust y value
+            y = y >= 0 ? x : 0;
+            y = (int)Mathf.Clamp(ImageArea.height, 0, ImageSize * ZoomSize) - y;
+            //y = (int)ImageArea.height - y;
+
+            Debug.Log("MousePos: " + MousePos + " Adjusted x: " + x + " y: " + y);
+
+            //CurrentImage.SetPixel((int)MousePos.x - positionBuffer, (int)MousePos.y - positionBuffer, CurrentColor);
+
+            //TODO: Need to adjust the brush size for the boundaries
+
+            //Testing the cursor position
+            CurrentImage.SetPixels(x,
+                                    y,
+                                    ZoomedBrushSize, 
+                                    ZoomedBrushSize, 
+                                    GetPixelColorArray(ZoomedBrushSize * ZoomedBrushSize, Color.red));
+            
             CurrentImage.Apply();
-            //}
         }
         Repaint();
-
-        //Draw Colors
-        //for (int i = 0; i < pixels.Length; i++)
-        //{
-        //    if (pixels[i] != null)
-        //    {
-        //        EditorGUI.DrawRect(pixels[i], colors[i]);
-        //        Debug.Log(colors[i]);
-        //    }
-        //}
     }
 
+    private void Update()
+    {
+        UpdateBrush();
+    }
+
+    private Color[] GetPixelColorArray(int size, Color color)
+    {
+        Color[] ColorArray = new Color[size];
+        for (int i = 0; i < ColorArray.Length; i++)
+        {
+            Color c = ColorArray[i];
+            c = Clone(color);
+        }
+        return ColorArray;
+    }
+
+    private void UpdatePixelColorArray()
+    {
+        Colors = new Color[ZoomedBrushSize * ZoomedBrushSize];
+        for(int i=0; i<Colors.Length; i++)
+        {
+            Color c = Colors[i];
+            c = Clone(CurrentColor);
+        }
+    }
+
+    private void UpdateBrush()
+    {
+        if (ImageArea.Overlaps(BrushRect))
+        {
+            Cursor.visible = false;
+        }
+        else
+        {
+            Cursor.visible = true;
+        }
+    }
+
+    #region UpdateImageSize
     private void UpdateImageSize()
     {
         CurrentImage = new Texture2D(adjustedSize, adjustedSize);
         ImageArea = new Rect(100, 100, CurrentImage.height, CurrentImage.width);
+    }
+
+    private void UpdateImageSize(Texture2D texture)
+    {
+        CurrentImage = texture;
+        ImageArea = new Rect(100, 100, CurrentImage.height, CurrentImage.width);
+    }
+    #endregion UpdateImageSize
+
+    //Clones a color
+    public Color Clone(Color color)
+    {
+        return new Color(color.r, color.g, color.b, color.a);
     }
 }
