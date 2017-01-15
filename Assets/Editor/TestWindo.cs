@@ -124,7 +124,7 @@ public class TestWindo : EditorWindow {
         CurrentColor = new Color(0, 0, 0);
         ImageSize = 32;
         BrushSize = 1;
-        UpdateImageSize(new Texture2D(1,1));
+        UpdateImageSize(new Texture2D(ImageSize * ZoomSize, ImageSize * ZoomSize));
         BrushRect = new Rect(0, 0, 1, 1);      
     }
 
@@ -146,14 +146,19 @@ public class TestWindo : EditorWindow {
         
         if (Event.current.type == EventType.MouseDown)//detect mousedown event
         {
-            int x = (int)MousePos.x - positionBuffer;
-            int y = (int)(MousePos.y - (-MousePos.y)) - positionBuffer;
-            
-            x = x >= 0 ? x : 0;
+            //int x = (int)Mathf.Clamp( (int)MousePos.x - positionBuffer, 0, CurrentImage.width );
+            //int y = (int)(MousePos.y - (-MousePos.y)) - positionBuffer;
+            //int y = (int)Mathf.Clamp( (int)(MousePos.y - (this.position.y) - (CurrentImage.height / 2)), 0, CurrentImage.height );
+            //int y = (int)Mathf.Clamp((int)(MousePos.y - (this.position.y) ), 0, CurrentImage.height);
+
+            //x = x >= 0 ? x : 0;
+
+            int x = (int)Mathf.Clamp((int)MousePos.x - ImageArea.position.x , 0, CurrentImage.width);
+            int y = (int)Mathf.Clamp((int)(MousePos.y - ImageArea.position.y), 0, CurrentImage.height);
 
             //adjust y value
-            y = y >= 0 ? x : 0;
-            y = (int)Mathf.Clamp(ImageArea.height, 0, ImageSize * ZoomSize) - y;
+            //y = y >= 0 ? x : 0;
+            //y = (int)Mathf.Clamp(ImageArea.height, 0, adjustedSize);
             //y = (int)ImageArea.height - y;
 
             Debug.Log("MousePos: " + MousePos + " Adjusted x: " + x + " y: " + y);
