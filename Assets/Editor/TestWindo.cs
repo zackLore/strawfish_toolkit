@@ -143,37 +143,46 @@ public class TestWindo : EditorWindow {
         {
             EditorGUI.DrawRect(BrushRect, CurrentColor);
         }
-        
+
+        EditorGUILayout.LabelField("Window Pos: " + this.position + " ImagePos: " + ImageArea.position);
+        Vector3 adj = new Vector3( Mathf.Clamp(MousePos.x - this.position.x - ImageArea.position.x, 0, ImageArea.width),
+                                   Mathf.Clamp(MousePos.y - this.position.y - ImageArea.position.y, 0, ImageArea.height) );
+        EditorGUILayout.LabelField("Mouse Pos: " + MousePos + " Relative Mouse Pos: " + adj);
+
         if (Event.current.type == EventType.MouseDown)//detect mousedown event
         {
-            //int x = (int)Mathf.Clamp( (int)MousePos.x - positionBuffer, 0, CurrentImage.width );
-            //int y = (int)(MousePos.y - (-MousePos.y)) - positionBuffer;
-            //int y = (int)Mathf.Clamp( (int)(MousePos.y - (this.position.y) - (CurrentImage.height / 2)), 0, CurrentImage.height );
-            //int y = (int)Mathf.Clamp((int)(MousePos.y - (this.position.y) ), 0, CurrentImage.height);
+            //TODO: This section currently draws one square of the correct size and color but it is not limited to a grid in any way.
+            //      The next steps are to take the width of the image, make each brush size = 1 part of the total width so 128 size 
+            //      means the brush size of 1 = 1 / 128 and so on.
 
-            //x = x >= 0 ? x : 0;
-
-            int x = (int)Mathf.Clamp((int)MousePos.x - ImageArea.position.x , 0, CurrentImage.width);
-            int y = (int)Mathf.Clamp((int)(MousePos.y - ImageArea.position.y), 0, CurrentImage.height);
-
-            //adjust y value
-            //y = y >= 0 ? x : 0;
-            //y = (int)Mathf.Clamp(ImageArea.height, 0, adjustedSize);
-            //y = (int)ImageArea.height - y;
-
-            Debug.Log("MousePos: " + MousePos + " Adjusted x: " + x + " y: " + y);
-
-            //CurrentImage.SetPixel((int)MousePos.x - positionBuffer, (int)MousePos.y - positionBuffer, CurrentColor);
-
-            //TODO: Need to adjust the brush size for the boundaries
+            Debug.Log("MousePos: " + MousePos + " Adjusted x: " + adj.x + " y: " + adj.y);
 
             //Testing the cursor position
-            CurrentImage.SetPixels(x,
-                                    y,
-                                    ZoomedBrushSize, 
-                                    ZoomedBrushSize, 
-                                    GetPixelColorArray(ZoomedBrushSize * ZoomedBrushSize, Color.red));
-            
+            int x = 0;
+            int y = 0;
+            for (int i = 0; i < ZoomedBrushSize; i++)
+            {
+                x = (int)adj.x + i;
+                y = (int)ImageArea.height - (int)adj.y;
+
+                if (x <= ImageArea.height && x >= 0 &&
+                        y <= ImageArea.width && y >= 0)
+                {
+                    CurrentImage.SetPixel(x, y, CurrentColor);
+                }
+
+                for (int j = 0; j < ZoomedBrushSize; j++)
+                {
+                    y = (int)ImageArea.height - (int)adj.y - j;
+
+                    if (x <= ImageArea.height && x >= 0 &&
+                        y <= ImageArea.width && y >= 0 )
+                    {
+                        CurrentImage.SetPixel(x, y, CurrentColor);
+                    }
+                }
+            }            
+
             CurrentImage.Apply();
         }
         Repaint();
