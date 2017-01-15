@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
+using System;
 
 public class TestWindo : EditorWindow {
     [MenuItem("Window/ Test Editor Window")]
@@ -14,7 +15,7 @@ public class TestWindo : EditorWindow {
 
     Rect BrushRect;    
     Color[] Colors;
-    Texture2D CurrentImage = null;
+    //Texture2D CurrentImage = null;
     Rect ImageArea;
     Vector3 MousePos = new Vector3(0, 0);
 
@@ -58,6 +59,28 @@ public class TestWindo : EditorWindow {
                 {
                     UpdatePixelColorArray();
                 }
+            }
+        }
+    }
+    #endregion
+
+    #region CurrentImage
+    private Texture2D _currentImage;
+    public Texture2D CurrentImage
+    {
+        get
+        {
+            if (_currentImage == null)
+            {
+                _currentImage = new Texture2D(1,1);
+            }
+            return _currentImage;
+        }
+        set
+        {
+            if (value != _currentImage)
+            {
+                _currentImage = value;
             }
         }
     }
@@ -114,16 +137,18 @@ public class TestWindo : EditorWindow {
     #endregion
 
     int adjustedSize = 0;
-    int col = 0;
-    int row = 0;
     int positionBuffer = 100;
+    float xCorrect = 4f;
+    float yCorrect = 4f;
+    Vector2 offset;
 
     private void OnEnable()
     {
+        offset = new Vector2(xCorrect, yCorrect);
         ZoomSize = 4;
         CurrentColor = new Color(0, 0, 0);
-        ImageSize = 32;
-        BrushSize = 1;
+        ImageSize = 64;
+        BrushSize = 4;
         UpdateImageSize(new Texture2D(ImageSize * ZoomSize, ImageSize * ZoomSize));
         BrushRect = new Rect(0, 0, 1, 1);      
     }
@@ -137,55 +162,102 @@ public class TestWindo : EditorWindow {
         EditorGUI.DrawPreviewTexture(ImageArea, CurrentImage);
 
         CurrentColor = EditorGUILayout.ColorField("Color: ", CurrentColor, null);
-        BrushRect = new Rect(MousePos.x, MousePos.y - position.y, ZoomedBrushSize, ZoomedBrushSize);
+        
+        EditorGUILayout.LabelField("Window Pos: " + this.position + " ImagePos: " + ImageArea.position);
+        Vector3 adj = new Vector3( Mathf.Clamp(MousePos.x - this.position.x - ImageArea.position.x, 0, ImageArea.width),
+                                   Mathf.Clamp(MousePos.y - this.position.y - ImageArea.position.y, 0, ImageArea.height) );
+        //Used to calculate the square to draw on the image
+        Vector2 previewCoord = FindCoord(adj);        
+        //Used to calculate the square to draw on the screen as a preview
+        Vector2 previewMouseCoord = FindCoord(MousePos, true);
 
+        //BrushRect = new Rect(MousePos.x, MousePos.y - position.y, ZoomedBrushSize, ZoomedBrushSize);
+        //BrushRect = new Rect(previewCoord.x, previewCoord.y - position.y, ZoomedBrushSize, ZoomedBrushSize);
+        BrushRect = new Rect(previewMouseCoord.x + xCorrect, previewMouseCoord.y + yCorrect, ZoomedBrushSize, ZoomedBrushSize);
+
+        EditorGUILayout.LabelField("Mouse Pos: " + MousePos + " Relative Mouse Pos: " + adj);
+        EditorGUILayout.LabelField("Grid Pos: " + previewCoord + " Preview Mouse: " + previewMouseCoord);
+        //Draw the preview brush
         if (!Cursor.visible)
         {
             EditorGUI.DrawRect(BrushRect, CurrentColor);
         }
-
-        EditorGUILayout.LabelField("Window Pos: " + this.position + " ImagePos: " + ImageArea.position);
-        Vector3 adj = new Vector3( Mathf.Clamp(MousePos.x - this.position.x - ImageArea.position.x, 0, ImageArea.width),
-                                   Mathf.Clamp(MousePos.y - this.position.y - ImageArea.position.y, 0, ImageArea.height) );
-        EditorGUILayout.LabelField("Mouse Pos: " + MousePos + " Relative Mouse Pos: " + adj);
 
         if (Event.current.type == EventType.MouseDown)//detect mousedown event
         {
             //TODO: This section currently draws one square of the correct size and color but it is not limited to a grid in any way.
             //      The next steps are to take the width of the image, make each brush size = 1 part of the total width so 128 size 
             //      means the brush size of 1 = 1 / 128 and so on.
-
-            Debug.Log("MousePos: " + MousePos + " Adjusted x: " + adj.x + " y: " + adj.y);
-
+            
             //Testing the cursor position
-            int x = 0;
-            int y = 0;
-            for (int i = 0; i < ZoomedBrushSize; i++)
-            {
-                x = (int)adj.x + i;
-                y = (int)ImageArea.height - (int)adj.y;
-
-                if (x <= ImageArea.height && x >= 0 &&
-                        y <= ImageArea.width && y >= 0)
-                {
-                    CurrentImage.SetPixel(x, y, CurrentColor);
-                }
-
-                for (int j = 0; j < ZoomedBrushSize; j++)
-                {
-                    y = (int)ImageArea.height - (int)adj.y - j;
-
-                    if (x <= ImageArea.height && x >= 0 &&
-                        y <= ImageArea.width && y >= 0 )
-                    {
-                        CurrentImage.SetPixel(x, y, CurrentColor);
-                    }
-                }
-            }            
+            DrawPixels(previewCoord);
 
             CurrentImage.Apply();
         }
         Repaint();
+    }
+
+    private void DrawPixels(Vector3 pos)
+    {
+        int x = 0;
+        int y = 0;
+        for (int i = 0; i < ZoomedBrushSize; i++)
+        {
+            x = (int)pos.x + i;
+            y = (int)ImageArea.height - (int)pos.y;
+
+            if (x <= ImageArea.height && x >= 0 &&
+                    y <= ImageArea.width && y >= 0)
+            {
+                CurrentImage.SetPixel(x, y, CurrentColor);
+            }
+
+            for (int j = 0; j < ZoomedBrushSize; j++)
+            {
+                y = (int)ImageArea.height - (int)pos.y - j;
+
+                if (x <= ImageArea.height && x >= 0 &&
+                    y <= ImageArea.width && y >= 0)
+                {
+                    CurrentImage.SetPixel(x, y, CurrentColor);
+                }
+            }
+        }
+    }
+
+    private Vector2 FindCoord(Vector3 coords, bool global = false)
+    {
+        int w = (int)ImageArea.width;
+        int h = (int)ImageArea.height;
+        int xRemainder = (int)(coords.x - w);
+        int yRemainder = (int)(coords.y - h);
+        int halfWidth = (int)(w / 2);
+        int halfHeight = (int)(h / 2);
+
+        int newX = 0;
+        int newY = 0;
+
+        if (global)
+        {
+            var x = coords.x;
+            var y = coords.y - position.y;
+
+            var blockRemainderX = (x % ZoomedBrushSize);
+            var blockRemainderY = (y % ZoomedBrushSize);            
+
+            newX = blockRemainderX <= ZoomedBrushSize ? (int)(x - blockRemainderX) : (int)((x - blockRemainderX) + ZoomedBrushSize);
+            newY = blockRemainderY <= ZoomedBrushSize ? (int)(y - blockRemainderY) : (int)((coords.y - blockRemainderY) + ZoomedBrushSize);
+        }
+        else
+        {
+            var blockRemainderX = (coords.x % ZoomedBrushSize);
+            var blockRemainderY = (coords.y % ZoomedBrushSize);
+
+            newX = blockRemainderX <= ZoomedBrushSize ? (int)Mathf.Clamp(coords.x - blockRemainderX, 0, w) : (int)Mathf.Clamp((coords.x - blockRemainderX) + ZoomedBrushSize, 0, w);
+            newY = blockRemainderY <= ZoomedBrushSize ? (int)Mathf.Clamp(coords.y - blockRemainderY, 0, h) : (int)Mathf.Clamp((coords.y - blockRemainderY) + ZoomedBrushSize, 0, h);
+        }               
+        
+        return new Vector2(newX, newY);
     }
 
     private void Update()
