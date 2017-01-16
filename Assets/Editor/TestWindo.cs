@@ -138,8 +138,8 @@ public class TestWindo : EditorWindow {
 
     int adjustedSize = 0;
     int positionBuffer = 100;
-    float xCorrect = 4f;
-    float yCorrect = 4f;
+    float xCorrect = 1f;
+    float yCorrect = 1f;
     Vector2 offset;
 
     private void OnEnable()
@@ -173,7 +173,8 @@ public class TestWindo : EditorWindow {
 
         //BrushRect = new Rect(MousePos.x, MousePos.y - position.y, ZoomedBrushSize, ZoomedBrushSize);
         //BrushRect = new Rect(previewCoord.x, previewCoord.y - position.y, ZoomedBrushSize, ZoomedBrushSize);
-        BrushRect = new Rect(previewMouseCoord.x + xCorrect, previewMouseCoord.y + yCorrect, ZoomedBrushSize, ZoomedBrushSize);
+        BrushRect = new Rect(previewMouseCoord.x + xCorrect, previewMouseCoord.y + yCorrect, ZoomedBrushSize, ZoomedBrushSize);        
+        Rect TestRect = new Rect(previewMouseCoord.x, previewMouseCoord.y, ZoomedBrushSize, ZoomedBrushSize);
 
         EditorGUILayout.LabelField("Mouse Pos: " + MousePos + " Relative Mouse Pos: " + adj);
         EditorGUILayout.LabelField("Grid Pos: " + previewCoord + " Preview Mouse: " + previewMouseCoord);
@@ -181,6 +182,8 @@ public class TestWindo : EditorWindow {
         if (!Cursor.visible)
         {
             EditorGUI.DrawRect(BrushRect, CurrentColor);
+            //EditorGUI.DrawRect(TestRect, Color.red);
+
         }
 
         if (Event.current.type == EventType.MouseDown)//detect mousedown event
@@ -206,8 +209,8 @@ public class TestWindo : EditorWindow {
             x = (int)pos.x + i;
             y = (int)ImageArea.height - (int)pos.y;
 
-            if (x <= ImageArea.height && x >= 0 &&
-                    y <= ImageArea.width && y >= 0)
+            if (x < ImageArea.height && x >= 0 &&
+                    y < ImageArea.width && y >= 0)
             {
                 CurrentImage.SetPixel(x, y, CurrentColor);
             }
@@ -216,8 +219,8 @@ public class TestWindo : EditorWindow {
             {
                 y = (int)ImageArea.height - (int)pos.y - j;
 
-                if (x <= ImageArea.height && x >= 0 &&
-                    y <= ImageArea.width && y >= 0)
+                if (x < ImageArea.height && x >= 0 &&
+                    y < ImageArea.width && y >= 0)
                 {
                     CurrentImage.SetPixel(x, y, CurrentColor);
                 }
