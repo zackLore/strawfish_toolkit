@@ -13,11 +13,11 @@ public class TestWindo : EditorWindow {
         window.titleContent = title;
     }
 
-    Rect BrushRect;    
+    Rect BrushRect;
     Color[] Colors;
-    //Texture2D CurrentImage = null;
     Rect ImageArea;
     Vector3 MousePos = new Vector3(0, 0);
+    Texture2D PreviousFrame;
 
     #region BrushSize
     private int _brushSize;
@@ -139,7 +139,7 @@ public class TestWindo : EditorWindow {
     int adjustedSize = 0;
     int positionBuffer = 100;
     float xCorrect = 1f;
-    float yCorrect = 1f;
+    float yCorrect = 10f;
     Vector2 offset;
 
     private void OnEnable()
@@ -149,7 +149,7 @@ public class TestWindo : EditorWindow {
         CurrentColor = new Color(0, 0, 0);
         ImageSize = 64;
         BrushSize = 4;
-        UpdateImageSize(new Texture2D(ImageSize * ZoomSize, ImageSize * ZoomSize));
+        UpdateImageSize(new Texture2D(ImageSize * ZoomSize, ImageSize * ZoomSize));        
         BrushRect = new Rect(0, 0, 1, 1);      
     }
 
@@ -166,25 +166,28 @@ public class TestWindo : EditorWindow {
         EditorGUILayout.LabelField("Window Pos: " + this.position + " ImagePos: " + ImageArea.position);
         Vector3 adj = new Vector3( Mathf.Clamp(MousePos.x - this.position.x - ImageArea.position.x, 0, ImageArea.width),
                                    Mathf.Clamp(MousePos.y - this.position.y - ImageArea.position.y, 0, ImageArea.height) );
+
         //Used to calculate the square to draw on the image
         Vector2 previewCoord = FindCoord(adj);        
         //Used to calculate the square to draw on the screen as a preview
         Vector2 previewMouseCoord = FindCoord(MousePos, true);
-
-        //BrushRect = new Rect(MousePos.x, MousePos.y - position.y, ZoomedBrushSize, ZoomedBrushSize);
-        //BrushRect = new Rect(previewCoord.x, previewCoord.y - position.y, ZoomedBrushSize, ZoomedBrushSize);
-        BrushRect = new Rect(previewMouseCoord.x + xCorrect, previewMouseCoord.y + yCorrect, ZoomedBrushSize, ZoomedBrushSize);        
-        Rect TestRect = new Rect(previewMouseCoord.x, previewMouseCoord.y, ZoomedBrushSize, ZoomedBrushSize);
+        
+        BrushRect = new Rect(previewMouseCoord.x, previewMouseCoord.y, ZoomedBrushSize, ZoomedBrushSize);
 
         EditorGUILayout.LabelField("Mouse Pos: " + MousePos + " Relative Mouse Pos: " + adj);
         EditorGUILayout.LabelField("Grid Pos: " + previewCoord + " Preview Mouse: " + previewMouseCoord);
+
         //Draw the preview brush
         if (!Cursor.visible)
         {
             EditorGUI.DrawRect(BrushRect, CurrentColor);
-            //EditorGUI.DrawRect(TestRect, Color.red);
-
         }
+
+        //var pixels = CurrentImage.GetPixels32();
+        //PreviousFrame = new Texture2D(adjustedSize, adjustedSize);
+        //PreviousFrame.SetPixels32(pixels);
+
+        //DrawPixels(previewCoord);
 
         if (Event.current.type == EventType.MouseDown)//detect mousedown event
         {
@@ -197,6 +200,7 @@ public class TestWindo : EditorWindow {
 
             CurrentImage.Apply();
         }
+        
         Repaint();
     }
 
@@ -228,36 +232,64 @@ public class TestWindo : EditorWindow {
         }
     }
 
+    private void DrawPixels(Vector3 pos, Texture2D target)
+    {
+        int x = 0;
+        int y = 0;
+        for (int i = 0; i < ZoomedBrushSize; i++)
+        {
+            x = (int)pos.x + i;
+            y = (int)target.height - (int)pos.y;
+
+            if (x < target.height && x >= 0 &&
+                    y < target.width && y >= 0)
+            {
+                target.SetPixel(x, y, CurrentColor);
+            }
+
+            for (int j = 0; j < ZoomedBrushSize; j++)
+            {
+                y = (int)target.height - (int)pos.y - j;
+
+                if (x < target.height && x >= 0 &&
+                    y < target.width && y >= 0)
+                {
+                    target.SetPixel(x, y, CurrentColor);
+                }
+            }
+        }
+    }
+
     private Vector2 FindCoord(Vector3 coords, bool global = false)
     {
-        int w = (int)ImageArea.width;
-        int h = (int)ImageArea.height;
-        int xRemainder = (int)(coords.x - w);
-        int yRemainder = (int)(coords.y - h);
-        int halfWidth = (int)(w / 2);
-        int halfHeight = (int)(h / 2);
-
-        int newX = 0;
-        int newY = 0;
+        float w = ImageArea.width;
+        float h = ImageArea.height;
+        //float xRemainder = (coords.x - w);
+        //float yRemainder = (coords.y - h);
+        //float halfWidth = (w / 2);
+        //float halfHeight = (h / 2);
+        
+        float newX = 0;
+        float newY = 0;
 
         if (global)
         {
             var x = coords.x;
             var y = coords.y - position.y;
 
-            var blockRemainderX = (x % ZoomedBrushSize);
-            var blockRemainderY = (y % ZoomedBrushSize);            
+            var blockRemainderX = (x % BrushSize);
+            var blockRemainderY = (y % BrushSize);            
 
-            newX = blockRemainderX <= ZoomedBrushSize ? (int)(x - blockRemainderX) : (int)((x - blockRemainderX) + ZoomedBrushSize);
-            newY = blockRemainderY <= ZoomedBrushSize ? (int)(y - blockRemainderY) : (int)((coords.y - blockRemainderY) + ZoomedBrushSize);
+            newX = blockRemainderX <= BrushSize ? x - blockRemainderX : ((x - blockRemainderX) + BrushSize);
+            newY = blockRemainderY <= BrushSize ? y - blockRemainderY : ((coords.y - blockRemainderY) + BrushSize);
         }
         else
         {
-            var blockRemainderX = (coords.x % ZoomedBrushSize);
-            var blockRemainderY = (coords.y % ZoomedBrushSize);
+            var blockRemainderX = (coords.x % BrushSize);
+            var blockRemainderY = (coords.y % BrushSize);
 
-            newX = blockRemainderX <= ZoomedBrushSize ? (int)Mathf.Clamp(coords.x - blockRemainderX, 0, w) : (int)Mathf.Clamp((coords.x - blockRemainderX) + ZoomedBrushSize, 0, w);
-            newY = blockRemainderY <= ZoomedBrushSize ? (int)Mathf.Clamp(coords.y - blockRemainderY, 0, h) : (int)Mathf.Clamp((coords.y - blockRemainderY) + ZoomedBrushSize, 0, h);
+            newX = blockRemainderX <= BrushSize ? Mathf.Clamp(coords.x - blockRemainderX, 0, w) : Mathf.Clamp((coords.x - blockRemainderX) + BrushSize, 0, w);
+            newY = blockRemainderY <= BrushSize ? Mathf.Clamp(coords.y - blockRemainderY, 0, h) : Mathf.Clamp((coords.y - blockRemainderY) + BrushSize, 0, h);
         }               
         
         return new Vector2(newX, newY);
