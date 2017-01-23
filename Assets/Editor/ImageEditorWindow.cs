@@ -70,10 +70,6 @@ public class ImageEditorWindow : EditorWindow {
             {
                 mousePosString_ = String.Format("x: {0}, y: {1}", MousePos.x.ToString(), MousePos.y.ToString());
             }
-            else
-            {
-                mousePosString_ = "";
-            }
             return mousePosString_;
         }
     }
