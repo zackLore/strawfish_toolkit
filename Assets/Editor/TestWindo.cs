@@ -4,6 +4,8 @@ using UnityEngine;
 using UnityEditor;
 using System;
 using System.Linq;
+using System.ComponentModel;
+using System.Text;
 
 public class TestWindo : EditorWindow {
     [MenuItem("Window/ Test Editor Window")]
@@ -15,10 +17,13 @@ public class TestWindo : EditorWindow {
     }
 
     Rect BrushRect;
+    bool ColorUpdateComplete;
     ColorChange NewPaletteColor;
     bool PaletteColorChanged;
+    bool UpdatingColor;
     List<Color> PaletteVerifier = new List<Color>();
     Color[] Colors;
+    Color[] NewPixels = null;
     Rect ImageArea;
     Vector3 MousePos = new Vector3(0, 0);
     Texture2D PreviousFrame;
@@ -112,10 +117,10 @@ public class TestWindo : EditorWindow {
                     UpdatePixelColorArray();
                     if (!ColorPalette.Contains(_currentColor))
                     {
-                        Debug.Log("Color added: " + _currentColor.ToString());
+                        //Debug.Log("Color added: " + _currentColor.ToString());
                         ShowPalette = false;
-                        ColorPalette.Add(Clone(_currentColor));
-                        PaletteVerifier.Add(Clone(_currentColor));
+                        //ColorPalette.Add(Clone(_currentColor));
+                        //PaletteVerifier.Add(Clone(_currentColor));
                     }
                 }
             }
@@ -203,20 +208,31 @@ public class TestWindo : EditorWindow {
     float yCorrect = 10f;
 
     private void OnEnable()
-    {        
-        ZoomSize = 4;
-        ColorPalette.Clear();
-        CurrentColor = new Color(0, 0, 0, 1);
-        ColorPalette.Add(Clone(CurrentColor));
-        ImageSize = 64;
-        BrushSize = 4;
-        UpdateImageSize(new Texture2D(ImageSize * ZoomSize, ImageSize * ZoomSize));        
-        BrushRect = new Rect(0, 0, 1, 1);      
+    {
+        ClearValues();
     }
 
     private void OnGUI()
     {
+        //if (!Selection.activeObject == this) { return; }
+
+        if (ColorUpdateComplete)
+        {
+            if (NewPixels != null)
+            {
+                Debug.Log(CurrentImage.GetPixels().Length + " | " + NewPixels.Length);
+                CurrentImage.SetPixels(NewPixels);
+                CurrentImage.Apply();
+                ColorUpdateComplete = false;
+            }
+        }
+
         heightGrowthBuffer = 0;
+
+        if (GUILayout.Button("Clear"))
+        {
+            ClearValues();
+        }
 
         ImageSize = EditorGUILayout.IntField("Image Size: ", ImageSize % 2 == 0 ? ImageSize : 0);
         BrushSize = EditorGUILayout.IntField("Brush Size: ", BrushSize);
@@ -228,21 +244,29 @@ public class TestWindo : EditorWindow {
         ShowPalette = EditorGUILayout.Foldout(ShowPalette, "Color Palette (" + ColorPalette.Count + ")", true);
         if (ShowPalette)
         {
-            try
-            {
+            //try
+            //{
                 //foreach (var col in ColorPalette)
-                for (int i=0; i<ColorPalette.Count; i++)
+                for (int i = 0; i < ColorPalette.Count; i++)
                 {
                     //ColorPalette[i] = EditorGUILayout.ColorField("Color: ", ColorPalette[i]);
                     Color c = EditorGUILayout.ColorField("Color: ", ColorPalette[i]);
                     if (!c.SameColor(ColorPalette[i])) { ColorPalette[i] = c; }
                     //EditorGUILayout.ColorField("Color: ", ColorPalette[i]);
                 }
-            }
-            catch (Exception ex)
-            {
-                Debug.Log(ex.ToString());
-            }
+            //}
+            //catch (UnityException uEx)
+            //{
+            //    Debug.Log(uEx.ToString());
+            //}
+            //catch (ExitGUIException GUIEx)
+            //{
+            //    Debug.Log(GUIEx.ToString());
+            //}
+            //catch (Exception ex)
+            //{
+            //    Debug.Log(ex.ToString());
+            //}
          }
 
         EditorGUI.DrawPreviewTexture(ImageArea, CurrentImage);
@@ -286,13 +310,27 @@ public class TestWindo : EditorWindow {
             //Debug.Log("Preview Coord: " + previewCoord);
 
             CurrentImage.Apply();
+
+            if (!ColorPalette.Contains(CurrentColor))
+            {
+                ShowPalette = false;
+                ColorPalette.Add(Clone(CurrentColor));
+                PaletteVerifier.Add(Clone(_currentColor));
+            }
         }
 
         if (PaletteColorChanged)//Change this to a separate thread 
         {
             try
             {
-                UpdatePalette(NewPaletteColor);
+                //UpdatePalette(NewPaletteColor);
+                if (!PaletteThread.IsBusy && !UpdatingColor)
+                {
+                    Debug.Log("Fire Worker");
+                    UpdatingColor = true;
+                    Color[] pixels = CurrentImage.GetPixels();
+                    PaletteThread.RunWorkerAsync(pixels);
+                }
             }
             catch (Exception ex)
             {
@@ -301,6 +339,21 @@ public class TestWindo : EditorWindow {
         }
                 
         Repaint();
+    }
+
+    public void ClearValues()
+    {
+        ZoomSize = 4;
+        ColorPalette.Clear();
+        CurrentColor = new Color(0, 0, 0, 1);
+        //ColorPalette.Add(Clone(CurrentColor));
+        ImageSize = 64;
+        BrushSize = 4;
+        UpdateImageSize(new Texture2D(ImageSize * ZoomSize, ImageSize * ZoomSize));
+        BrushRect = new Rect(0, 0, 1, 1);
+        InitPaletteThread();
+        UpdatingColor = false;
+        PaletteColorChanged = false;
     }
 
     private void DrawPixels(Vector3 pos)
@@ -413,72 +466,55 @@ public class TestWindo : EditorWindow {
 
     private void PalleteChanged(int num)
     {
+        ShowPalette = false;
         Debug.Log("PalleteChanged");
         //Find the color that changed
         ColorChange changed = new ColorChange();
-        PaletteColorChanged = false;
 
         for (int i = 0; i < PaletteVerifier.Count; i++)
         {
             Color c = PaletteVerifier.ElementAt(i);
-            if (!ColorPalette.Contains(c))
+            if (!ColorPalette.Contains(c) && !PaletteColorChanged)
             {
                 changed.OriginalColor = c;
                 changed.NewColor = ColorPalette.ElementAt(i);
                 NewPaletteColor = changed;
                 PaletteColorChanged = true;
+                //Debug.Log(changed.OriginalColor + " : " + changed.NewColor + " | " + PaletteColorChanged);
                 return;
             }            
         }
-
-        //if (changed.NewColor != null && changed.OriginalColor != null)
-        //{
-        //    var oldPixels = CurrentImage.GetPixels();
-        //    var newPixels = CurrentImage.GetPixels();
-        //    for (int i=0; i<oldPixels.Length; i++)
-        //    {
-        //        Color pixel = oldPixels[i];
-        //        if (pixel.r == changed.OriginalColor.r &&
-        //            pixel.g == changed.OriginalColor.g &&
-        //            pixel.b == changed.OriginalColor.b &&
-        //            pixel.a == changed.OriginalColor.a)
-        //        {
-        //            newPixels.SetValue(Clone(pixel), i);
-        //        }
-        //    }
-
-        //    CurrentImage.SetPixels(newPixels);
-        //}
     }
 
-    private void UpdatePalette(ColorChange changed)
+    private Color[] UpdatePalette(ColorChange changed, Color[] pixels = null)
     {
-        if (changed != null && changed.NewColor != null && changed.OriginalColor != null)
+        //Debug.Log("Changed " + changed.ToString() + " | pixels: " + pixels != null ? pixels.ToString() : "null");
+        if (changed != null && changed.NewColor != null && changed.OriginalColor != null && pixels != null)
         {
-            var oldPixels = CurrentImage.GetPixels();
-            var newPixels = CurrentImage.GetPixels();
+            //Debug.Log("Changing Colors...");            
+            Color[] newPixels = new Color[pixels.Length];
+            Array.Copy(pixels, newPixels, pixels.Length);
+            var oldPixels = pixels;
             for (int i = 0; i < oldPixels.Length; i++)
             {
                 Color pixel = oldPixels[i];
                 if (pixel.SameColor(changed.OriginalColor))
-                //if (pixel.r == changed.OriginalColor.r &&
-                //    pixel.g == changed.OriginalColor.g &&
-                //    pixel.b == changed.OriginalColor.b &&
-                //    pixel.a == changed.OriginalColor.a)
                 {
                     newPixels.SetValue(Clone(pixel), i);
                 }
             }
 
-            CurrentImage.SetPixels(newPixels);
-            CurrentImage.Apply();
+            //CurrentImage.SetPixels(newPixels);
+            //CurrentImage.Apply();
 
             var color = PaletteVerifier.Where(x => x == changed.OriginalColor).FirstOrDefault();
             if (color != null)
             {
                 color = changed.NewColor;
             }
+            return newPixels;
         }
+        return null;
     }
 
     private void UpdatePixelColorArray()
@@ -530,6 +566,40 @@ public class TestWindo : EditorWindow {
     public Color Clone(Color color)
     {
         return new Color(color.r, color.g, color.b, color.a);
+    }
+
+    // ========================================================================================
+    // Helper Threads
+    // ========================================================================================   
+    BackgroundWorker PaletteThread = null;
+
+    public void InitPaletteThread()
+    {
+        PaletteThread = new BackgroundWorker();
+        PaletteThread.DoWork += PaletteThread_DoWork;
+        PaletteThread.RunWorkerCompleted += PaletteThread_RunWorkerCompleted;
+    }
+
+    private void PaletteThread_DoWork(object sender, DoWorkEventArgs e)
+    {
+        var pixels = e.Argument;
+        e.Result = UpdatePalette(NewPaletteColor, (Color[])pixels);
+    }
+
+    private void PaletteThread_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+    {
+        if (e.Result != null)
+        {
+            Color[] NewPixels = (Color[])e.Result;
+            ColorUpdateComplete = true;
+            //CurrentImage.SetPixels(NewPixels);
+            //CurrentImage.Apply();
+
+            Debug.Log("Worker Complete");
+        }
+
+        PaletteColorChanged = false;
+        UpdatingColor = false;
     }
 }
 
@@ -612,8 +682,14 @@ public class ColorChange
         OriginalColor = o;
         NewColor = n;
     }
-}
 
+    public override string ToString()
+    {
+        StringBuilder s = new StringBuilder();
+        s.Append("OriginalColor: ").Append(OriginalColor != null ? OriginalColor.ToString() : "null").Append(NewColor != null ? NewColor.ToString() : "null");
+        return s.ToString();
+    }
+}
 
 public static class Extensions
 {
