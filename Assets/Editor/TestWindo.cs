@@ -220,10 +220,17 @@ public class TestWindo : EditorWindow {
         {
             if (NewPixels != null)
             {
-                Debug.Log(CurrentImage.GetPixels().Length + " | " + NewPixels.Length);
-                CurrentImage.SetPixels(NewPixels);
+                //Debug.Log(CurrentImage.GetPixels().Length + " | " + NewPixels.Length);
+                Texture2D t = new Texture2D(CurrentImage.width, CurrentImage.height);
+                t.SetPixels(NewPixels);
+                //EditorGUI.DrawPreviewTexture(ImageArea, t);
+                //CurrentImage.SetPixels(NewPixels);
+                CurrentImage = t;
                 CurrentImage.Apply();
+                //Repaint();
+                //Debug.Log("Pixels Set" + DateTime.Now);
                 ColorUpdateComplete = false;
+                NewPixels = null;
             }
         }
 
@@ -244,29 +251,13 @@ public class TestWindo : EditorWindow {
         ShowPalette = EditorGUILayout.Foldout(ShowPalette, "Color Palette (" + ColorPalette.Count + ")", true);
         if (ShowPalette)
         {
-            //try
-            //{
-                //foreach (var col in ColorPalette)
-                for (int i = 0; i < ColorPalette.Count; i++)
-                {
-                    //ColorPalette[i] = EditorGUILayout.ColorField("Color: ", ColorPalette[i]);
-                    Color c = EditorGUILayout.ColorField("Color: ", ColorPalette[i]);
-                    if (!c.SameColor(ColorPalette[i])) { ColorPalette[i] = c; }
-                    //EditorGUILayout.ColorField("Color: ", ColorPalette[i]);
-                }
-            //}
-            //catch (UnityException uEx)
-            //{
-            //    Debug.Log(uEx.ToString());
-            //}
-            //catch (ExitGUIException GUIEx)
-            //{
-            //    Debug.Log(GUIEx.ToString());
-            //}
-            //catch (Exception ex)
-            //{
-            //    Debug.Log(ex.ToString());
-            //}
+            for (int i = 0; i < ColorPalette.Count; i++)
+            {
+                //ColorPalette[i] = EditorGUILayout.ColorField("Color: ", ColorPalette[i]);
+                Color c = EditorGUILayout.ColorField("Color: ", ColorPalette[i]);
+                if (!c.SameColor(ColorPalette[i])) { ColorPalette[i] = c; }
+                //EditorGUILayout.ColorField("Color: ", ColorPalette[i]);
+            }
          }
 
         EditorGUI.DrawPreviewTexture(ImageArea, CurrentImage);
@@ -277,7 +268,6 @@ public class TestWindo : EditorWindow {
         //Used to calculate the square to draw on the image
         Vector2 previewCoord = FindCoord(adj);
         //Used to calculate the square to draw on the screen as a preview
-        //Vector2 previewMouseCoord = FindCoord(new Vector2(MousePos.x - this.position.x - ImageArea.position.x, MousePos.y - this.position.y - ImageArea.height), true);
         Vector2 previewMouseCoord = FindCoord(MousePos, true);
 
         BrushRect = new Rect(previewMouseCoord.x, previewMouseCoord.y, ZoomedBrushSize, ZoomedBrushSize);
@@ -326,7 +316,7 @@ public class TestWindo : EditorWindow {
                 //UpdatePalette(NewPaletteColor);
                 if (!PaletteThread.IsBusy && !UpdatingColor)
                 {
-                    Debug.Log("Fire Worker");
+                    //Debug.Log("Fire Worker");
                     UpdatingColor = true;
                     Color[] pixels = CurrentImage.GetPixels();
                     PaletteThread.RunWorkerAsync(pixels);
@@ -345,6 +335,7 @@ public class TestWindo : EditorWindow {
     {
         ZoomSize = 4;
         ColorPalette.Clear();
+        PaletteVerifier.Clear();
         CurrentColor = new Color(0, 0, 0, 1);
         //ColorPalette.Add(Clone(CurrentColor));
         ImageSize = 64;
@@ -467,52 +458,62 @@ public class TestWindo : EditorWindow {
     private void PalleteChanged(int num)
     {
         ShowPalette = false;
-        Debug.Log("PalleteChanged");
+        //Debug.Log("PalleteChanged");
         //Find the color that changed
         ColorChange changed = new ColorChange();
 
         for (int i = 0; i < PaletteVerifier.Count; i++)
         {
             Color c = PaletteVerifier.ElementAt(i);
+
+            //Debug.Log("PaletteVerifier[" + i + "] = " + c.ToString() + " ColorPalette[" + i + "] = " + ColorPalette.ElementAt(i).ToString() + " Same = " + c.SameColor(ColorPalette.ElementAt(i)));
             if (!ColorPalette.Contains(c) && !PaletteColorChanged)
             {
-                changed.OriginalColor = c;
-                changed.NewColor = ColorPalette.ElementAt(i);
+                //Debug.Log(PaletteColorChanged);
+                changed.OriginalColor = Clone(c);
+                changed.NewColor = Clone(ColorPalette.ElementAt(i));
                 NewPaletteColor = changed;
-                PaletteColorChanged = true;
                 //Debug.Log(changed.OriginalColor + " : " + changed.NewColor + " | " + PaletteColorChanged);
-                return;
+                //return;
             }            
         }
+
+        PaletteColorChanged = true;
     }
 
     private Color[] UpdatePalette(ColorChange changed, Color[] pixels = null)
     {
-        //Debug.Log("Changed " + changed.ToString() + " | pixels: " + pixels != null ? pixels.ToString() : "null");
         if (changed != null && changed.NewColor != null && changed.OriginalColor != null && pixels != null)
         {
-            //Debug.Log("Changing Colors...");            
             Color[] newPixels = new Color[pixels.Length];
             Array.Copy(pixels, newPixels, pixels.Length);
+
             var oldPixels = pixels;
             for (int i = 0; i < oldPixels.Length; i++)
             {
                 Color pixel = oldPixels[i];
                 if (pixel.SameColor(changed.OriginalColor))
                 {
-                    newPixels.SetValue(Clone(pixel), i);
+                    newPixels.SetValue(Clone(changed.NewColor), i);
                 }
             }
 
-            //CurrentImage.SetPixels(newPixels);
-            //CurrentImage.Apply();
-
-            var color = PaletteVerifier.Where(x => x == changed.OriginalColor).FirstOrDefault();
-            if (color != null)
+            PaletteVerifier.Clear();
+            foreach (var c in ColorPalette)
             {
-                color = changed.NewColor;
+                PaletteVerifier.Add(Clone(c));
             }
+            //var color = PaletteVerifier.Where(x => x == changed.OriginalColor).FirstOrDefault();
+            //if (color != null)
+            //{
+
+            //    color = changed.NewColor;
+            //}
             return newPixels;
+        }
+        else
+        {
+            Debug.Log("Changed or pixels where null.");
         }
         return null;
     }
@@ -583,14 +584,15 @@ public class TestWindo : EditorWindow {
     private void PaletteThread_DoWork(object sender, DoWorkEventArgs e)
     {
         var pixels = e.Argument;
-        e.Result = UpdatePalette(NewPaletteColor, (Color[])pixels);
+        var results = UpdatePalette(NewPaletteColor, (Color[])pixels);
+        e.Result = results;
     }
 
     private void PaletteThread_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
     {
         if (e.Result != null)
         {
-            Color[] NewPixels = (Color[])e.Result;
+            NewPixels = (Color[])e.Result;
             ColorUpdateComplete = true;
             //CurrentImage.SetPixels(NewPixels);
             //CurrentImage.Apply();
@@ -693,12 +695,35 @@ public class ColorChange
 
 public static class Extensions
 {
-    public static bool SameColor(this Color c1, Color c2)
+    public static bool SameColor(this Color c1, Color c2)//Needs to correctly convert from float to int (0-255)
     {
-        if (c1.r == c2.r &&
-            c1.g == c2.g &&
-            c1.b == c2.b &&
-            c1.a == c2.a)
+        //Color32 color1 = new Color32(c1.r, c1.g, c1.b, c1.a);
+        //Color32 color2 = new Color32(c2.r, c2.g, c2.b, c2.a);
+
+        //Debug.Log(Mathf.Round(c1.r * 1000f) + " -> " + Mathf.Round(c1.r * 1000f) / 1000f);
+        //Debug.Log(Mathf.RoundToInt(c1.r * 10f) + " --> " + Mathf.RoundToInt(c1.r * 10f) / 10f);
+        //Debug.Log(c1.r / 255 + " ---> " + c2.r / 255);
+        //if (Mathf.RoundToInt(c1.r * 1000f) == Mathf.RoundToInt(c2.r * 1000f) &&
+        //    Mathf.RoundToInt(c1.g * 1000f) == Mathf.RoundToInt(c2.g * 1000f) &&
+        //    Mathf.RoundToInt(c1.b * 1000f) == Mathf.RoundToInt(c2.b * 1000f) &&
+        //    Mathf.RoundToInt(c1.a * 1000f) == Mathf.RoundToInt(c2.a * 1000f))
+        //if (Mathf.Round(c1.r * 100f) / 100f == Mathf.Round(c2.r * 100f) / 100f &&
+        //    Mathf.Round(c1.g * 100f) / 100f == Mathf.Round(c2.g * 100f) / 100f &&
+        //    Mathf.Round(c1.b * 100f) / 100f == Mathf.Round(c2.b * 100f) / 100f &&
+        //    Mathf.Round(c1.a * 100f) / 100f == Mathf.Round(c2.a * 100f) / 100f)
+        //if (Mathf.Round(c1.r * 10f) / 10f == Mathf.Round(c2.r * 10f) / 10f &&
+        //    Mathf.Round(c1.g * 10f) / 10f == Mathf.Round(c2.g * 10f) / 10f &&
+        //    Mathf.Round(c1.b * 10f) / 10f == Mathf.Round(c2.b * 10f) / 10f &&
+        //    Mathf.Round(c1.a * 10f) / 10f == Mathf.Round(c2.a * 10f) / 10f)
+        if (Mathf.Round(c1.r) == Mathf.Round(c2.r) &&
+            Mathf.Round(c1.g) == Mathf.Round(c2.g) &&
+            Mathf.Round(c1.b) == Mathf.Round(c2.b) &&
+            Mathf.Round(c1.a) == Mathf.Round(c2.a) )
+        //if(c1.r/255 == c2.r/255 &&
+        //    c1.g / 255 == c2.g / 255 &&
+        //    c1.b / 255 == c2.b / 255 &&
+        //    c1.a / 255 == c2.a / 255 )
+
         {
             return true;
         }
