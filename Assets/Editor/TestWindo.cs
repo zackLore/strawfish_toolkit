@@ -6,6 +6,8 @@ using System;
 using System.Linq;
 using System.ComponentModel;
 using System.Text;
+using Microsoft.Win32;
+using System.IO;
 
 public class TestWindo : EditorWindow {
     [MenuItem("Window/ Test Editor Window")]
@@ -17,6 +19,7 @@ public class TestWindo : EditorWindow {
     }
 
     Rect BrushRect;
+    Rect ButtonRect;
     bool ColorUpdateComplete;
     ColorChange NewPaletteColor;
     bool PaletteColorChanged;
@@ -27,6 +30,7 @@ public class TestWindo : EditorWindow {
     Rect ImageArea;
     Vector3 MousePos = new Vector3(0, 0);
     Texture2D PreviousFrame;
+    bool SnapToGrid;
 
     #region ShowPalette
     private bool _showPalette;
@@ -202,13 +206,16 @@ public class TestWindo : EditorWindow {
 
     int adjustedSize = 0;
     int heightGrowthBuffer = 0;
-    int positionBuffer = 100;
+    int positionBuffer = 150;
     int widthGrowthBuffer = 0;
     float xCorrect = 1f;
     float yCorrect = 10f;
 
     private void OnEnable()
     {
+        positionBuffer = 150;
+        SnapToGrid = true;
+        ButtonRect = new Rect(position.x + position.width - 250, position.height - 50, 200, 200);
         ClearValues();
     }
 
@@ -259,6 +266,8 @@ public class TestWindo : EditorWindow {
                 //EditorGUILayout.ColorField("Color: ", ColorPalette[i]);
             }
          }
+
+        SnapToGrid = EditorGUILayout.Toggle("Snap To Grid", SnapToGrid);
 
         EditorGUI.DrawPreviewTexture(ImageArea, CurrentImage);
 
@@ -327,7 +336,18 @@ public class TestWindo : EditorWindow {
                 Debug.Log(ex.ToString());
             }
         }
-                
+
+        //Save Button
+        GUILayout.BeginArea(ButtonRect);
+
+        if (GUILayout.Button("Save Image"))
+        {
+            //handle save
+            SaveImage();
+        }
+
+        GUILayout.EndArea();        
+
         Repaint();
     }
 
@@ -416,19 +436,44 @@ public class TestWindo : EditorWindow {
             var x = coords.x - position.x;
             var y = coords.y - position.y;
 
-            var blockRemainderX = (x % BrushSize);
-            var blockRemainderY = (y % BrushSize);
+            if (!SnapToGrid)
+            {
+                var blockRemainderX = (x % BrushSize);
+                var blockRemainderY = (y % BrushSize);
 
-            newX = blockRemainderX <= BrushSize ? x - blockRemainderX : ((x - blockRemainderX) + BrushSize);
-            newY = blockRemainderY <= BrushSize ? y - blockRemainderY : ((y - blockRemainderY) + BrushSize);
+                newX = blockRemainderX <= BrushSize ? x - blockRemainderX : ((x - blockRemainderX) + BrushSize);
+                newY = blockRemainderY <= BrushSize ? y - blockRemainderY : ((y - blockRemainderY) + BrushSize);
+            }
+            else
+            {
+                var xx =  x - ImageArea.position.x;
+                var yy = y - ImageArea.position.y;
+
+                var blockRemainderX = (xx % ZoomedBrushSize);
+                var blockRemainderY = (yy % ZoomedBrushSize);
+
+                newX = blockRemainderX <= ZoomedBrushSize ? x - blockRemainderX : ((x - blockRemainderX) + ZoomedBrushSize);
+                newY = blockRemainderY <= ZoomedBrushSize ? y - blockRemainderY : ((y - blockRemainderY) + ZoomedBrushSize);
+            }
         }
         else
         {
-            var blockRemainderX = (coords.x % BrushSize);
-            var blockRemainderY = (coords.y % BrushSize);
+            if (!SnapToGrid)
+            {
+                var blockRemainderX = (coords.x % BrushSize);
+                var blockRemainderY = (coords.y % BrushSize);
 
-            newX = blockRemainderX <= BrushSize ? Mathf.Clamp(coords.x - blockRemainderX, 0, w) : Mathf.Clamp((coords.x - blockRemainderX) + BrushSize, 0, w);
-            newY = blockRemainderY <= BrushSize ? Mathf.Clamp(coords.y - blockRemainderY, 0, h) : Mathf.Clamp((coords.y - blockRemainderY) + BrushSize, 0, h);
+                newX = blockRemainderX <= BrushSize ? Mathf.Clamp(coords.x - blockRemainderX, 0, w) : Mathf.Clamp((coords.x - blockRemainderX) + BrushSize, 0, w);
+                newY = blockRemainderY <= BrushSize ? Mathf.Clamp(coords.y - blockRemainderY, 0, h) : Mathf.Clamp((coords.y - blockRemainderY) + BrushSize, 0, h);
+            }
+            else
+            {
+                var blockRemainderX = (coords.x % ZoomedBrushSize);
+                var blockRemainderY = (coords.y % ZoomedBrushSize);
+
+                newX = blockRemainderX <= ZoomedBrushSize ? Mathf.Clamp(coords.x - blockRemainderX, 0, w - 1) : Mathf.Clamp((coords.x - blockRemainderX) + ZoomedBrushSize, 0, w - 1);
+                newY = blockRemainderY <= ZoomedBrushSize ? Mathf.Clamp(coords.y - blockRemainderY, 0, h - 1) : Mathf.Clamp((coords.y - blockRemainderY) + ZoomedBrushSize, 0, h - 1);
+            }
         }
 
         return new Vector2(newX, newY);
@@ -479,6 +524,44 @@ public class TestWindo : EditorWindow {
         }
 
         PaletteColorChanged = true;
+    }
+
+    //http://wiki.unity3d.com/index.php?title=TextureScale
+    private void SaveImage()
+    {
+        //EditorUtility.DisplayDialogComplex("Select a Folder", "Choose the save location for your image...", "OK", "Cancel", "Alt");
+        var imagePath = EditorUtility.SaveFilePanel("Select a File", "C", "testImage", "png");
+        Debug.Log(imagePath);
+
+        //shrink to real image size
+        Color[] oldPixels = CurrentImage.GetPixels();
+        Color[] newPixels = new Color[oldPixels.Length / ZoomSize];
+
+        //int j = 0;
+        //for (int i = 0; i < oldPixels.Length; i += ZoomSize)
+        //{
+        //    newPixels[j++] = oldPixels[i];
+        //}
+
+        //Texture2D newImage = new Texture2D(CurrentImage.width / ZoomSize, CurrentImage.height / ZoomSize);
+        //newImage.SetPixels(newPixels);
+
+        Texture2D newImage = new Texture2D(CurrentImage.width, CurrentImage.height);
+        newImage.SetPixels(oldPixels);
+        TextureScale.Bilinear(newImage, CurrentImage.width / ZoomSize, CurrentImage.height / ZoomSize);
+
+        //Texture2D newImage = CurrentImage;
+        //newImage.Resize(newImage.width / ZoomSize, newImage.height / ZoomSize);
+
+        var png = newImage.EncodeToPNG();
+
+        File.WriteAllBytes(imagePath, png);
+        System.Diagnostics.Process.Start(imagePath);
+
+        //FileDialog 
+        //FileDialog fileDialog = new OpenFileDialog();
+        //fileDialog.ShowDialog();
+        //filePath.Text = fileDialog.FileName;
     }
 
     private Color[] UpdatePalette(ColorChange changed, Color[] pixels = null)
