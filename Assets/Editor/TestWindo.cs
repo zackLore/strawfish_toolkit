@@ -8,6 +8,7 @@ using System.ComponentModel;
 using System.Text;
 using Microsoft.Win32;
 using System.IO;
+using System.Collections.ObjectModel;
 
 public class TestWindo : EditorWindow {
     [MenuItem("Window/ Test Editor Window")]
@@ -31,6 +32,10 @@ public class TestWindo : EditorWindow {
     Vector3 MousePos = new Vector3(0, 0);
     Texture2D PreviousFrame;
     bool SnapToGrid;
+
+    public ColorPalette Palette;
+    public int CurrentPaletteIndex = 0;
+    public PaletteTracker PaletteList = new PaletteTracker();
 
     #region ShowPalette
     private bool _showPalette;
@@ -216,7 +221,7 @@ public class TestWindo : EditorWindow {
         positionBuffer = 150;
         SnapToGrid = true;
         ButtonRect = new Rect(position.x + position.width - 250, position.height - 50, 200, 200);
-        ClearValues();
+        ClearValues();        
     }
 
     private void OnGUI()
@@ -254,6 +259,8 @@ public class TestWindo : EditorWindow {
         MousePos = GUIUtility.GUIToScreenPoint(Event.current.mousePosition);        
 
         CurrentColor = EditorGUILayout.ColorField("Color: ", CurrentColor, null);
+        
+        AddColorButtons(Palette.DefaultColors);
 
         ShowPalette = EditorGUILayout.Foldout(ShowPalette, "Color Palette (" + ColorPalette.Count + ")", true);
         if (ShowPalette)
@@ -265,14 +272,14 @@ public class TestWindo : EditorWindow {
                 if (!c.SameColor(ColorPalette[i])) { ColorPalette[i] = c; }
                 //EditorGUILayout.ColorField("Color: ", ColorPalette[i]);
             }
-         }
+        }
 
         SnapToGrid = EditorGUILayout.Toggle("Snap To Grid", SnapToGrid);
 
         EditorGUI.DrawPreviewTexture(ImageArea, CurrentImage);
-
-        Vector3 adj = new Vector3( Mathf.Clamp(MousePos.x - this.position.x - ImageArea.position.x, 0, ImageArea.width),
-                                   Mathf.Clamp(MousePos.y - this.position.y - ImageArea.position.y, 0, ImageArea.height) );
+        
+        Vector3 adj = new Vector3(MousePos.x - this.position.x - ImageArea.position.x,
+                                  MousePos.y - this.position.y - ImageArea.position.y);
 
         //Used to calculate the square to draw on the image
         Vector2 previewCoord = FindCoord(adj);
@@ -281,13 +288,9 @@ public class TestWindo : EditorWindow {
 
         BrushRect = new Rect(previewMouseCoord.x, previewMouseCoord.y, ZoomedBrushSize, ZoomedBrushSize);
 
-        //EditorGUILayout.LabelField("Window Pos: " + this.position + " ImagePos: " + ImageArea.position);
-        //EditorGUILayout.LabelField("Mouse Pos: " + MousePos + " Relative Mouse Pos: " + adj);
-        //EditorGUILayout.LabelField("Grid Pos: " + previewCoord + " Preview Mouse: " + previewMouseCoord);
-
         UpdateBrush();
         //Draw the preview brush
-        if (!Cursor.visible)
+        if (ImageArea.Overlaps(BrushRect))
         {
             EditorGUI.DrawRect(BrushRect, CurrentColor);
         }
@@ -298,23 +301,36 @@ public class TestWindo : EditorWindow {
 
         //DrawPixels(previewCoord);
 
-        if (Event.current.type == EventType.mouseDown || Event.current.type == EventType.MouseDrag)//detect mousedown event
-        {
-            //TODO: This section currently draws one square of the correct size and color but it is not limited to a grid in any way.
-            //      The next steps are to take the width of the image, make each brush size = 1 part of the total width so 128 size 
-            //      means the brush size of 1 = 1 / 128 and so on.
-            
-            //Testing the cursor position
+        if ((Event.current.type == EventType.mouseDown || Event.current.type == EventType.MouseDrag) && ImageArea.Overlaps(BrushRect))//detect mousedown event
+        {            
             DrawPixels(previewCoord);
-            //Debug.Log("Preview Coord: " + previewCoord);
-
             CurrentImage.Apply();
+
+            if (!PaletteList.Contains(CurrentColor))
+            {
+                Debug.Log("Add Entry");
+                PaletteList.Entries.Add(new PaletteEntry(Clone(CurrentColor)));
+                CurrentPaletteIndex = PaletteList.Entries.Count - 1;//Set to last item in the list
+            }
 
             if (!ColorPalette.Contains(CurrentColor))
             {
                 ShowPalette = false;
                 ColorPalette.Add(Clone(CurrentColor));
                 PaletteVerifier.Add(Clone(_currentColor));
+            }
+
+            try
+            {
+                var entry = PaletteList.Entries.ElementAt(CurrentPaletteIndex);
+                if (entry != null)
+                {
+                    entry.Strokes.Add(new Vector2(MousePos.x, MousePos.y));
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.Log(ex.ToString());
             }
         }
 
@@ -337,11 +353,42 @@ public class TestWindo : EditorWindow {
             }
         }
 
+        //Rect butRect = new Rect(0, positionBuffer - 20, 25, 25);
+        //Texture2D ButtonTexture = new Texture2D(15, 15);
+        //var colors_ = ButtonTexture.GetPixels();
+        //for (int i = 0; i < colors_.Length; i++)
+        //{
+        //    colors_[i] = ColorPalette.Count() > 0 ? ColorPalette.ElementAt(0) : CurrentColor;
+        //}
+        //ButtonTexture.SetPixels(colors_);
+        //ButtonTexture.Apply();
+
+        //var pad = GUI.skin.button;
+        //GUIStyle style = new GUIStyle(pad);
+        //style.padding = new RectOffset(0,0,5,5);
+
+        //GUILayout.BeginArea(butRect);
+        //if (GUILayout.Button(ButtonTexture, style))
+        //{
+        //    Debug.Log(Event.current.button);
+        //    if (Event.current.button == 0)
+        //    {
+        //        //CurrentColor = ColorPalette.Count() > 0 ? ColorPalette.ElementAt(0) : CurrentColor;
+        //        CurrentColor = PaletteList.Entries.Count > 0 ? PaletteList.Entries.ElementAt(CurrentPaletteIndex).CurrentColor : CurrentColor;
+        //    }
+        //    else
+        //    {
+        //        CurrentPaletteIndex = 0;
+        //        CurrentColor = PaletteList.Entries.Count > 0 ? PaletteList.Entries.ElementAt(CurrentPaletteIndex).CurrentColor : CurrentColor;
+        //    }
+        //}
+        //GUILayout.EndArea();
+
         //Save Button
         GUILayout.BeginArea(ButtonRect);
 
         if (GUILayout.Button("Save Image"))
-        {
+        {            
             //handle save
             SaveImage();
         }
@@ -349,6 +396,55 @@ public class TestWindo : EditorWindow {
         GUILayout.EndArea();        
 
         Repaint();
+    }
+
+    public void AddColorButtons(List<Color> colors)
+    {
+        int xPos = 0;
+        int yPos = 20;
+        
+        Rect paletteRect = new Rect(0, positionBuffer - 20, 400, 50);
+        GUILayout.BeginHorizontal();
+
+        for (int i=0; i<colors.Count; i++)
+        {
+            Rect butRect = new Rect(xPos, positionBuffer - yPos, 25, 25);
+            Texture2D ButtonTexture = new Texture2D(15, 15);
+            var colors_ = ButtonTexture.GetPixels();
+            for (int j = 0; j < colors_.Length; j++)
+            {
+                colors_[j] = colors[i];
+            }
+            ButtonTexture.SetPixels(colors_);
+            ButtonTexture.Apply();
+
+            var pad = GUI.skin.button;
+            GUIStyle style = new GUIStyle(pad);
+            style.padding = new RectOffset(0, 0, 5, 5);
+
+            //GUILayout.BeginArea(butRect);
+            if (GUILayout.Button(ButtonTexture, style))
+            {
+                if (Event.current.button == 0)
+                {
+                    CurrentColor = colors[i];
+                }
+                else
+                {
+                    //Change Color
+                }
+            }
+            //GUILayout.EndArea();
+
+            xPos += 25;
+            if (xPos >= 400)
+            {
+                xPos = 0;
+                yPos += 20;
+            }
+        }
+
+        GUILayout.EndHorizontal();
     }
 
     public void ClearValues()
@@ -361,10 +457,28 @@ public class TestWindo : EditorWindow {
         ImageSize = 64;
         BrushSize = 4;
         UpdateImageSize(new Texture2D(ImageSize * ZoomSize, ImageSize * ZoomSize));
+        //PaintPixels(0, 0, CurrentImage.height, CurrentImage.width, CurrentImage, Color.red);
+        try
+        {
+            Debug.Log("Painting...");
+            PaintPixels(CurrentImage, new Color(1,1,1,0));
+            Repaint();
+        }
+        catch (Exception ex)
+        {
+            Debug.Log(ex.ToString());
+        }
         BrushRect = new Rect(0, 0, 1, 1);
         InitPaletteThread();
         UpdatingColor = false;
         PaletteColorChanged = false;
+
+        Debug.Log(PaletteList);
+
+        Palette = new ColorPalette();
+        PaletteList = new PaletteTracker();
+        PaletteList.Entries.Add(new PaletteEntry(CurrentColor));
+        CurrentPaletteIndex = 0;    
     }
 
     private void DrawPixels(Vector3 pos)
@@ -373,8 +487,10 @@ public class TestWindo : EditorWindow {
         int y = 0;
         for (int i = 0; i < ZoomedBrushSize; i++)
         {
-            x = (int)pos.x + i;
-            y = (int)ImageArea.height - (int)pos.y;
+            //x = (int)pos.x + i;
+            //y = (int)ImageArea.height - (int)pos.y;
+            x = (int)Mathf.Ceil(pos.x + i);
+            y = (int)Mathf.Ceil(ImageArea.height - pos.y);
 
             if (x < ImageArea.height && x >= 0 &&
                     y < ImageArea.width && y >= 0)
@@ -384,7 +500,8 @@ public class TestWindo : EditorWindow {
 
             for (int j = 0; j < ZoomedBrushSize; j++)
             {
-                y = (int)ImageArea.height - (int)pos.y - j;
+                //y = (int)ImageArea.height - (int)pos.y - j;
+                y = (int)Mathf.Ceil(ImageArea.height - pos.y - j);
 
                 if (x < ImageArea.height && x >= 0 &&
                     y < ImageArea.width && y >= 0)
@@ -401,8 +518,10 @@ public class TestWindo : EditorWindow {
         int y = 0;
         for (int i = 0; i < ZoomedBrushSize; i++)
         {
-            x = (int)pos.x + i;
-            y = (int)target.height - (int)pos.y;
+            //x = (int)pos.x + i;
+            //y = (int)target.height - (int)pos.y;
+            x = (int)Mathf.Ceil(pos.x + i);
+            y = (int)Mathf.Ceil(ImageArea.height - pos.y);
 
             if (x < target.height && x >= 0 &&
                     y < target.width && y >= 0)
@@ -412,7 +531,8 @@ public class TestWindo : EditorWindow {
 
             for (int j = 0; j < ZoomedBrushSize; j++)
             {
-                y = (int)target.height - (int)pos.y - j;
+                //y = (int)target.height - (int)pos.y - j;
+                y = (int)Mathf.Ceil(ImageArea.height - pos.y - j);
 
                 if (x < target.height && x >= 0 &&
                     y < target.width && y >= 0)
@@ -484,11 +604,6 @@ public class TestWindo : EditorWindow {
         return FindCoord(new Vector2(coords.x, coords.y), global);
     }
 
-    private void Update()
-    {
-        //UpdateBrush();
-    }
-
     private Color[] GetPixelColorArray(int size, Color color)
     {
         Color[] ColorArray = new Color[size];
@@ -498,6 +613,35 @@ public class TestWindo : EditorWindow {
             c = Clone(color);
         }
         return ColorArray;
+    }
+
+    private void PaintPixels(Texture2D image, Color color)
+    {
+        //int x = 0;
+        //int y = 0;
+        for (int i = 0; i < image.width; i++)
+        {
+            //x = (int)Mathf.Ceil(pos.x + i);
+            //y = (int)Mathf.Ceil(image.height - pos.y);
+
+            //if (x < image.height && x >= 0 &&
+            //        y < image.width && y >= 0)
+            //{
+            //    image.SetPixel(x, y, color);
+            //}
+
+            for (int j = 0; j < image.height; j++)
+            {
+                //y = (int)Mathf.Ceil(image.height - pos.y - j);
+
+                if (i < image.height && i >= 0 &&
+                    j < image.width && j >= 0)
+                {
+                    image.SetPixel(i, j, color);
+                }
+            }
+        }
+        image.Apply();
     }
 
     private void PalleteChanged(int num)
@@ -603,12 +747,12 @@ public class TestWindo : EditorWindow {
 
     private void UpdatePixelColorArray()
     {
-        Colors = new Color[ZoomedBrushSize * ZoomedBrushSize];
-        for(int i=0; i<Colors.Length; i++)
-        {
-            Color c = Colors[i];
-            c = Clone(CurrentColor);
-        }
+        //Colors = new Color[ZoomedBrushSize * ZoomedBrushSize];
+        //for(int i=0; i<Colors.Length; i++)
+        //{
+        //    Color c = Colors[i];
+        //    c = Clone(CurrentColor);
+        //}
     }
 
     private void UpdateBrush()
@@ -633,6 +777,13 @@ public class TestWindo : EditorWindow {
         else
         {
             CurrentImage = new Texture2D(adjustedSize, adjustedSize);
+            //var pixels = CurrentImage.GetPixels();
+            //for (int i = 0; i < pixels.Length; i++)
+            //{
+            //    pixels[i] = Color.clear;
+            //}
+            //CurrentImage.SetPixels(pixels);
+            //CurrentImage.Apply();            
         }
         ImageArea = new Rect(positionBuffer + widthGrowthBuffer, positionBuffer + heightGrowthBuffer, CurrentImage.height, CurrentImage.width);
     }
@@ -776,6 +927,127 @@ public class ColorChange
     }
 }
 
+public class ColorPalette
+{
+    public List<Color> DefaultColors;
+    public List<Color> CustomPalette;
+
+    public ColorPalette()
+    {
+        DefaultColors = new List<Color>();
+        CustomPalette = new List<Color>();
+
+        //Defaults
+        DefaultColors.Add(Color.black);
+        DefaultColors.Add(Color.blue);
+        DefaultColors.Add(new Color(139 / 255f, 69 / 255f, 19 / 255f, 1));
+        DefaultColors.Add(Color.cyan);
+        DefaultColors.Add(Color.gray);
+        DefaultColors.Add(Color.green);
+        DefaultColors.Add(Color.magenta);
+        DefaultColors.Add(Color.red);
+        DefaultColors.Add(Color.white);
+        DefaultColors.Add(Color.yellow);
+    }
+
+    public ColorPalette(List<Color> defaultColors)
+    {
+        DefaultColors = defaultColors;
+        CustomPalette = new List<Color>();
+    }
+
+    public ColorPalette(List<Color> defaultColors, List<Color> customPalette)
+    {
+        DefaultColors = defaultColors;
+        CustomPalette = customPalette;
+    }
+}
+
+public class PaletteEntry
+{
+    public Color CurrentColor;
+    public List<Vector2> Strokes;
+
+    public PaletteEntry()
+    {
+        CurrentColor = Color.black;
+        Strokes = new List<Vector2>();
+    }
+
+    public PaletteEntry(Color color)
+    {
+        CurrentColor = color;
+        Strokes = new List<Vector2>();
+    }
+
+    public PaletteEntry(Color color, List<Vector2> positions)
+    {
+        CurrentColor = color;
+        Strokes = positions;
+    }
+
+    public PaletteEntry(List<Vector2> positions)
+    {
+        CurrentColor = Color.black;
+        Strokes = positions;
+    }
+
+    public override string ToString()
+    {
+        string temp = "";
+
+        temp += CurrentColor.ToString();
+        temp += " : " + Environment.NewLine;
+
+        foreach (var s in Strokes)
+        {
+            temp += "  " + s.ToString();
+        }
+
+        temp += Environment.NewLine;
+
+        return temp;
+    }
+}
+
+public class PaletteTracker : Collection<PaletteEntry>
+{
+    public List<PaletteEntry> Entries;
+
+    public PaletteTracker()
+    {
+        Entries = new List<PaletteEntry>();
+    }
+
+    public bool Contains(Color color)
+    {
+        foreach (PaletteEntry p in Entries)
+        {
+            if (p.CurrentColor.SameColor(color))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public override string ToString()
+    {
+        string temp = "";
+
+        foreach (var e in Entries)
+        {
+            temp += "Entry (" + Entries.IndexOf(e) + ")-> ";
+            temp += e.ToString();
+        }
+
+        return temp;
+    }
+}
+
+// ================================================================
+// Extensions
+// ================================================================
 public static class Extensions
 {
     public static bool SameColor(this Color c1, Color c2)//Needs to correctly convert from float to int (0-255)
@@ -798,15 +1070,19 @@ public static class Extensions
         //    Mathf.Round(c1.g * 10f) / 10f == Mathf.Round(c2.g * 10f) / 10f &&
         //    Mathf.Round(c1.b * 10f) / 10f == Mathf.Round(c2.b * 10f) / 10f &&
         //    Mathf.Round(c1.a * 10f) / 10f == Mathf.Round(c2.a * 10f) / 10f)
-        if (Mathf.Round(c1.r) == Mathf.Round(c2.r) &&
-            Mathf.Round(c1.g) == Mathf.Round(c2.g) &&
-            Mathf.Round(c1.b) == Mathf.Round(c2.b) &&
-            Mathf.Round(c1.a) == Mathf.Round(c2.a) )
+        //if (Mathf.Round(c1.r) == Mathf.Round(c2.r) &&
+        //    Mathf.Round(c1.g) == Mathf.Round(c2.g) &&
+        //    Mathf.Round(c1.b) == Mathf.Round(c2.b) &&
+        //    Mathf.Round(c1.a) == Mathf.Round(c2.a) )
         //if(c1.r/255 == c2.r/255 &&
         //    c1.g / 255 == c2.g / 255 &&
         //    c1.b / 255 == c2.b / 255 &&
         //    c1.a / 255 == c2.a / 255 )
 
+        if (c1.r * 255 == c2.r * 255 &&
+            c1.g * 255 == c2.g * 255 &&
+            c1.b * 255 == c2.b * 255 &&
+            c1.a * 255 == c2.a * 255 )
         {
             return true;
         }
