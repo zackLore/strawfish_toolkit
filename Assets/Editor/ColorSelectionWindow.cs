@@ -17,6 +17,13 @@ public class ColorSelectionWindow : EditorWindow {
 
         ColorSet = colorSet;
         Palette = palette;
+
+        int size = 0;
+        foreach (var p in Palette.DefaultColors)
+        {
+            size += 40;
+        }
+        window.maxSize = new Vector2(size + 20, 5);
     }
 
     private void OnEnable()
@@ -43,7 +50,10 @@ public class ColorSelectionWindow : EditorWindow {
         {
             InitButtonTextures(Palette.DefaultColors);
         }
-        GUILayout.BeginHorizontal();
+        
+        GUIStyle hStyle = new GUIStyle();
+        hStyle.margin = new RectOffset(5, 5, 25, 10);
+        GUILayout.BeginHorizontal(hStyle);
 
         for (int i = 0; i < colors.Count; i++)
         {
