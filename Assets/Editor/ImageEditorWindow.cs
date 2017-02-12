@@ -9,6 +9,7 @@ using System.Text;
 using Microsoft.Win32;
 using System.IO;
 using System.Collections.ObjectModel;
+using VNKit;
 
 // =====================
 // To Do
@@ -19,7 +20,7 @@ using System.Collections.ObjectModel;
 // =====================
 
 public class ImageEditorWindow : EditorWindow {
-    [MenuItem("Window/ Image Editor Window")]
+    [MenuItem("Window/ Image Editor")]
     public static void OpenTestWindo()
     {
         var window = EditorWindow.GetWindow(typeof(ImageEditorWindow));
@@ -196,6 +197,10 @@ public class ImageEditorWindow : EditorWindow {
         {
             if (value != _zoomSize)
             {
+                Texture2D newImage = new Texture2D(CurrentImage.width, CurrentImage.height);
+                newImage.SetPixels(CurrentImage.GetPixels());
+                TextureScale.Point(newImage, (CurrentImage.width / ZoomSize) * value, (CurrentImage.height / ZoomSize) * value);
+                CurrentImage = newImage;
                 _zoomSize = value;
             }
         }
@@ -234,19 +239,15 @@ public class ImageEditorWindow : EditorWindow {
     {
         heightGrowthBuffer = 0;
 
-        if (GUILayout.Button("Zoom"))
-        {
-            Scale += new Vector2(20f, -1f);
-            //GUIUtility.ScaleAroundPivot(Scale, new Vector2(window.position.width, window.position.height));
-            //GUIUtility.ScaleAroundPivot(new Vector2(Screen.width / 1440.0f, Screen.height / 900.0f), new Vector2(0.0f, 0.0f));
-            Debug.Log(Scale);
-        }
+        //if (GUILayout.Button("Zoom"))
+        //{
+        //    Scale += new Vector2(20f, -1f);
+        //    //GUIUtility.ScaleAroundPivot(Scale, new Vector2(window.position.width, window.position.height));
+        //    //GUIUtility.ScaleAroundPivot(new Vector2(Screen.width / 1440.0f, Screen.height / 900.0f), new Vector2(0.0f, 0.0f));
+        //    Debug.Log(Scale);
+        //}
 
-        if (GUILayout.Button("Clear"))
-        {
-            ClearValues();
-        }
-
+        ZoomSize = EditorGUILayout.IntSlider(ZoomSize, 1, 10);
         ImageSize = EditorGUILayout.IntField("Image Size: ", ImageSize % 2 == 0 ? ImageSize : 0);
         BrushSize = EditorGUILayout.IntField("Brush Size: ", BrushSize);
 
@@ -262,8 +263,22 @@ public class ImageEditorWindow : EditorWindow {
             AddPaletteTrackerButtons(PaletteList.GetColors());
         }
 
+        EditorGUILayout.BeginHorizontal();
         SnapToGrid = EditorGUILayout.Toggle("Snap To Grid", SnapToGrid);
 
+        if (GUILayout.Button("Clear"))
+        {
+            ClearValues();
+        }
+
+        if (GUILayout.Button("Save Image"))
+        {
+            //handle save
+            SaveImage();
+        }
+        
+        EditorGUILayout.EndHorizontal();
+        
         EditorGUI.DrawPreviewTexture(ImageArea, CurrentImage);
         
         Vector3 adj = new Vector2(MousePos.x - this.position.x - ImageArea.position.x,
@@ -333,19 +348,18 @@ public class ImageEditorWindow : EditorWindow {
         }
 
         //Save Button
-        GUILayout.BeginArea(ButtonRect);
+        //GUILayout.BeginArea(ButtonRect);
 
-        if (GUILayout.Button("Save Image"))
-        {            
-            //handle save
-            SaveImage();
-        }
+        //if (GUILayout.Button("Save Image"))
+        //{            
+        //    //handle save
+        //    SaveImage();
+        //}
 
-        GUILayout.EndArea();
+        //GUILayout.EndArea();
 
-        var window = EditorWindow.GetWindow(typeof(ImageEditorWindow));
-        GUIUtility.ScaleAroundPivot(Scale, new Vector2(window.position.width, window.position.height));
-        
+        //var window = EditorWindow.GetWindow(typeof(ImageEditorWindow));
+        //GUIUtility.ScaleAroundPivot(Scale, new Vector2(window.position.width, window.position.height));
 
         Repaint();
     }
@@ -734,7 +748,8 @@ public class ImageEditorWindow : EditorWindow {
 
         Texture2D newImage = new Texture2D(CurrentImage.width, CurrentImage.height);
         newImage.SetPixels(oldPixels);
-        TextureScale.Bilinear(newImage, CurrentImage.width / ZoomSize, CurrentImage.height / ZoomSize);
+        //TextureScale.Bilinear(newImage, CurrentImage.width / ZoomSize, CurrentImage.height / ZoomSize);
+        TextureScale.Point(newImage, CurrentImage.width / ZoomSize, CurrentImage.height / ZoomSize);
 
         //Texture2D newImage = CurrentImage;
         //newImage.Resize(newImage.width / ZoomSize, newImage.height / ZoomSize);
