@@ -14,7 +14,15 @@ using VNKit;
 // =====================
 // To Do
 // =====================
-// 1. Zoom
+// 1. Zoom -
+//      Zoom is off by a small amount causing the image to distort.  
+//      Need to create a color coordinate system to track positions
+//      of actual pixels regardless of size.  Then upon resize the
+//      image will be redrawn with the current brush size and zoom
+//      using the coordinate rather than the mouse position. Possibly
+//      use a large array to keep track of color positions so that if 
+//      the image scales up there does not need to be another array
+//      created and the image data will persist between zooms.
 // 2. Preview Windows
 // 3. Import Image
 // =====================
