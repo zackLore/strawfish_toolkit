@@ -199,6 +199,7 @@ public class ImageEditorWindow : EditorWindow {
     {
         get
         {
+            _zoomSize = _zoomSize < 1 ? 1 : _zoomSize;
             return _zoomSize;
         }
         set
