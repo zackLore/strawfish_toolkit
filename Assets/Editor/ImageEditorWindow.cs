@@ -32,11 +32,18 @@ public class ImageEditorWindow : EditorWindow {
     public static void OpenTestWindo()
     {
         var window = EditorWindow.GetWindow(typeof(ImageEditorWindow));
-        var title = new GUIContent("Image Editor Window");
+        var title = new GUIContent("Image Editor");
         window.titleContent = title;
     }
-    Color Canvas;
 
+    public Color[][] ImageData;
+
+    #region Icons
+    Texture2D EraserIcon;
+    Texture2D PaintBucketIcon;
+    #endregion Icons
+
+    Color Eraser;
     List<Texture2D> ButtonTextures;
     List<Texture2D> PaletteButtonTextures;
 
@@ -235,13 +242,39 @@ public class ImageEditorWindow : EditorWindow {
     float xCorrect = 1f;
     float yCorrect = 10f;
 
+    private int imaageDataSize;
+
     private void OnEnable()
     {
-        Canvas = new Color(.85f, .85f, .85f, 0);
-        positionBuffer = 170;
+        //initialize array
+        imaageDataSize = 1000;
+        ImageData = new Color[imaageDataSize][];
+        for (int i = 0; i < ImageData.Length; i++)
+        {
+            ImageData[i] = new Color[imaageDataSize];
+        }
+
+        LoadIcons();
+        Eraser = new Color(.85f, .85f, .85f, 0);
+        positionBuffer = 185;
         SnapToGrid = true;
         ButtonRect = new Rect(position.width / 2 - 100, position.height - 50, 200, 200);
         ClearValues();
+    }
+
+    private void LoadIcons()
+    {
+        try
+        {
+            EraserIcon = Resources.Load("Images/eraser2") as Texture2D;
+            PaintBucketIcon = Resources.Load("Images/paintBucket") as Texture2D;
+        }
+        catch (Exception ex)
+        {
+            EraserIcon = new Texture2D(25, 25);
+            PaintBucketIcon = new Texture2D(25, 25);
+            Debug.Log(ex.ToString());
+        }
     }
 
     private void OnGUI()
@@ -275,16 +308,30 @@ public class ImageEditorWindow : EditorWindow {
         EditorGUILayout.BeginHorizontal();
         SnapToGrid = EditorGUILayout.Toggle("Snap To Grid", SnapToGrid);
 
-        if (GUILayout.Button("Clear"))
+        var iconPadding = GUI.skin.button;
+        GUIStyle iconStyle = new GUIStyle(iconPadding);
+        iconStyle.padding = new RectOffset(0, 0, 5, 5);
+
+        if (GUILayout.Button(PaintBucketIcon, iconStyle, GUILayout.Width(32), GUILayout.Height(32)))
+        {
+            PaintPixels(CurrentImage, CurrentColor);
+        }
+
+        if (GUILayout.Button(EraserIcon, iconStyle, GUILayout.Width(32), GUILayout.Height(32)))
+        {
+            CurrentColor = Eraser;
+        }
+
+        if (GUILayout.Button("Clear", GUILayout.Height(32)))
         {
             ClearValues();
         }
 
-        if (GUILayout.Button("Save Image"))
+        if (GUILayout.Button("Save Image", GUILayout.Height(32)))
         {
             //handle save
             SaveImage();
-        }
+        }    
         
         EditorGUILayout.EndHorizontal();
         
@@ -309,14 +356,20 @@ public class ImageEditorWindow : EditorWindow {
             EditorGUI.DrawRect(new Rect(BrushRect.x + 2, BrushRect.y + 2, BrushRect.width - 4, BrushRect.height - 4), CurrentColor);
         }
 
-        if ((Event.current.type == EventType.mouseDown || Event.current.type == EventType.MouseDrag) && ImageArea.Overlaps(BrushRect))//detect mousedown event
+        // =====================================
+        // Mouse Down Event
+        // =====================================
+        if ((Event.current.type == EventType.mouseDown || Event.current.type == EventType.MouseDrag) && ImageArea.Overlaps(BrushRect))
         {            
             if (!PaletteList.Contains(CurrentColor))
             {
-                Debug.Log("Adding Color: " + CurrentColor + " pos: " + MousePos);
-                PaletteList.Entries.Add(new PaletteEntry(Clone(CurrentColor)));
-                CurrentPaletteIndex = PaletteList.GetIndex(CurrentColor);//Set to last item in the list
-                AddPaletteButtonTexture(CurrentPaletteIndex);
+                //Debug.Log("Adding Color: " + CurrentColor + " pos: " + MousePos);
+                if (!CurrentColor.SameColor(Eraser))
+                {
+                    PaletteList.Entries.Add(new PaletteEntry(Clone(CurrentColor)));
+                    CurrentPaletteIndex = PaletteList.GetIndex(CurrentColor);//Set to last item in the list
+                    AddPaletteButtonTexture(CurrentPaletteIndex);
+                }
             }
 
             try
@@ -332,13 +385,14 @@ public class ImageEditorWindow : EditorWindow {
                     Debug.Log("Null entry: " + CurrentPaletteIndex);
                     Debug.Log(PaletteList.ToString());
                 }
-                }
+            }
             catch (Exception ex)
             {
                 Debug.Log(ex.ToString());
             }
 
             DrawPixels(previewCoord);
+            AddCoord(previewCoord, CurrentColor);
             CurrentImage.Apply();
         }
 
@@ -355,21 +409,7 @@ public class ImageEditorWindow : EditorWindow {
                 Debug.Log(ex.ToString());
             }
         }
-
-        //Save Button
-        //GUILayout.BeginArea(ButtonRect);
-
-        //if (GUILayout.Button("Save Image"))
-        //{            
-        //    //handle save
-        //    SaveImage();
-        //}
-
-        //GUILayout.EndArea();
-
-        //var window = EditorWindow.GetWindow(typeof(ImageEditorWindow));
-        //GUIUtility.ScaleAroundPivot(Scale, new Vector2(window.position.width, window.position.height));
-
+        
         Repaint();
     }
 
@@ -472,7 +512,7 @@ public class ImageEditorWindow : EditorWindow {
         {
             //Debug.Log("Painting...");
             //PaintPixels(CurrentImage, new Color(1,1,1,0));
-            PaintPixels(CurrentImage, Canvas);
+            PaintPixels(CurrentImage, Eraser);
             Repaint();
         }
         catch (Exception ex)
@@ -890,15 +930,15 @@ public class ImageEditorWindow : EditorWindow {
             //CurrentImage.SetPixels(pixels);
             //CurrentImage.Apply();            
         }
-        ImageArea = new Rect(positionBuffer + widthGrowthBuffer, positionBuffer + heightGrowthBuffer, CurrentImage.height, CurrentImage.width);
+        ImageArea = new Rect(50, positionBuffer + heightGrowthBuffer, CurrentImage.height, CurrentImage.width);
         //PaintPixels(CurrentImage, new Color(1, 1, 1, 0));
-        PaintPixels(CurrentImage, Canvas);
+        PaintPixels(CurrentImage, Eraser);
     }
 
     private void UpdateImageSize(Texture2D texture)
     {
         CurrentImage = texture;
-        ImageArea = new Rect(positionBuffer + widthGrowthBuffer, positionBuffer + heightGrowthBuffer, CurrentImage.height, CurrentImage.width);
+        ImageArea = new Rect(50, positionBuffer + heightGrowthBuffer, CurrentImage.height, CurrentImage.width);
     }
     #endregion UpdateImageSize
 
@@ -908,6 +948,18 @@ public class ImageEditorWindow : EditorWindow {
     public Color Clone(Color color)
     {
         return new Color(color.r, color.g, color.b, color.a);
+    }
+
+    public void AddCoord(Vector2 pos, Color color)
+    {
+        try
+        {
+            ImageData[(int)pos.x][(int)pos.y] = Clone(color);
+        }
+        catch (Exception ex)
+        {
+            Debug.Log(ex.ToString());
+        }
     }
 
     // ========================================================================================
@@ -1046,15 +1098,19 @@ public class ColorPalette
         CustomPalette = new List<Color>();
 
         //Defaults
+        DefaultColors.Add(Color.white);
         DefaultColors.Add(Color.black);
-        DefaultColors.Add(Color.blue);
-        DefaultColors.Add(new Color(139 / 255f, 69 / 255f, 19 / 255f, 1));
-        DefaultColors.Add(Color.cyan);
         DefaultColors.Add(Color.gray);
+        DefaultColors.Add(Color.blue);
+        DefaultColors.Add(new Color(135/255f, 206 / 255f, 235/255f, 1));//135,206,235 sky blue
+        DefaultColors.Add(Color.cyan);        
         DefaultColors.Add(Color.green);
+        DefaultColors.Add(new Color(0, 128 / 255f, 0, 1));//green
+        DefaultColors.Add(new Color(0, 100 / 255f, 0, 1));//dark green
+        DefaultColors.Add(new Color(139 / 255f, 69 / 255f, 19 / 255f, 1));//brown
         DefaultColors.Add(Color.magenta);
         DefaultColors.Add(Color.red);
-        DefaultColors.Add(Color.white);
+        DefaultColors.Add(new Color(255/255f, 165/255f, 0, 1));//orange
         DefaultColors.Add(Color.yellow);
     }
 
