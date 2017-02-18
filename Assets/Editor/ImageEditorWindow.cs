@@ -36,7 +36,7 @@ public class ImageEditorWindow : EditorWindow {
         window.titleContent = title;
     }
 
-    public Color[][] ImageData;
+    public Color[,] ImageData;
 
     #region Icons
     Texture2D EraserIcon;
@@ -242,23 +242,13 @@ public class ImageEditorWindow : EditorWindow {
     float xCorrect = 1f;
     float yCorrect = 10f;
 
-    private int imaageDataSize;
+    private int imageDataSize;
 
     private void OnEnable()
     {
         //initialize array
-        imaageDataSize = 1000;
-        ImageData = new Color[imaageDataSize][];
-        for (int i = 0; i < ImageData.Length; i++)
-        {
-            var current = ImageData[i];
-            current = new Color[imaageDataSize];
-            for (int j = 0; j < current.Length; j++)//Set all to transparent
-            {
-                var c = current[j];
-                c = Clone(Eraser);
-            }
-        }
+        imageDataSize = 1000;
+        ImageData = new Color[imageDataSize, imageDataSize];
 
         LoadIcons();
         Eraser = new Color(.85f, .85f, .85f, 0);
@@ -962,13 +952,21 @@ public class ImageEditorWindow : EditorWindow {
         int row = 0;
         try
         {
-            col = (int)pos.x;
-            row = (int)pos.y;
-            ImageData[row][col] = Clone(color);
+            col = (int)(pos.x / ZoomSize);
+            row = (int)(pos.y / ZoomSize);
+
+            for (int x = 0; x < BrushSize; x++)
+            {
+                for (int y = 0; y < BrushSize; y ++)
+                {
+                    ImageData[row + y, col + x] = Clone(color);
+                    //Debug.Log(String.Format("row: {1} col: {0}", col + x, row + y));
+                }
+            }            
         }
         catch (Exception ex)
         {
-            Debug.Log("pos: " + pos + " col: " + col + " row: " + row + " color: " + color + " size: " + ImageData.Length + " error: " + ex.ToString());
+            //Debug.Log("pos: " + pos + " col: " + col + " row: " + row + " color: " + color + " size: " + ImageData.Length + " error: " + ex.ToString());
         }
     }
 
