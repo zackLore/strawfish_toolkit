@@ -251,7 +251,13 @@ public class ImageEditorWindow : EditorWindow {
         ImageData = new Color[imaageDataSize][];
         for (int i = 0; i < ImageData.Length; i++)
         {
-            ImageData[i] = new Color[imaageDataSize];
+            var current = ImageData[i];
+            current = new Color[imaageDataSize];
+            for (int j = 0; j < current.Length; j++)//Set all to transparent
+            {
+                var c = current[j];
+                c = Clone(Eraser);
+            }
         }
 
         LoadIcons();
@@ -952,13 +958,17 @@ public class ImageEditorWindow : EditorWindow {
 
     public void AddCoord(Vector2 pos, Color color)
     {
+        int col = 0;
+        int row = 0;
         try
         {
-            ImageData[(int)pos.x][(int)pos.y] = Clone(color);
+            col = (int)pos.x;
+            row = (int)pos.y;
+            ImageData[row][col] = Clone(color);
         }
         catch (Exception ex)
         {
-            Debug.Log(ex.ToString());
+            Debug.Log("pos: " + pos + " col: " + col + " row: " + row + " color: " + color + " size: " + ImageData.Length + " error: " + ex.ToString());
         }
     }
 
