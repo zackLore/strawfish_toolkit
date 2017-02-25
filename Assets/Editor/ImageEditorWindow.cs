@@ -36,7 +36,7 @@ public class ImageEditorWindow : EditorWindow {
         window.titleContent = title;
     }
 
-    public Color[,] ImageData;
+    public Stroke[,] ImageData;
 
     #region Icons
     Texture2D EraserIcon;
@@ -195,6 +195,38 @@ public class ImageEditorWindow : EditorWindow {
                 _imageSize = value;
                 adjustedSize = ImageSize * ZoomSize;
                 UpdateImageSize();
+                Stroke[,] temp = new Stroke[_imageSize, _imageSize];
+                //Debug.Log(temp.GetLength(0) + " -> size: " + _imageSize);
+                for (int x = 0; x < _imageSize; x++)
+                {
+                    for (int y = 0; y < _imageSize; y++)
+                    {
+                        temp[x, y] = new Stroke(Clone(Eraser), 1);
+                    }
+                }
+
+                if (ImageData.GetLength(0) >= _imageSize)
+                {
+                    for (int x = 0; x < _imageSize; x++)
+                    {
+                        for (int y = 0; y < _imageSize; y++)
+                        {
+                            temp[x, y] = ImageData[x, y];
+                        }
+                    }
+                }
+                else
+                {
+                    for (int x = 0; x < ImageData.GetLength(0); x++)
+                    {
+                        for (int y = 0; y < ImageData.GetLength(0); y++)
+                        {
+                            temp[x, y] = ImageData[x, y];
+                        }
+                    }
+                }
+                ImageData = temp;
+                Zoom(ZoomSize);       
             }
         }
     }
@@ -213,11 +245,19 @@ public class ImageEditorWindow : EditorWindow {
         {
             if (value != _zoomSize)
             {
-                Texture2D newImage = new Texture2D(CurrentImage.width, CurrentImage.height);
-                newImage.SetPixels(CurrentImage.GetPixels());
-                TextureScale.Point(newImage, (CurrentImage.width / ZoomSize) * value, (CurrentImage.height / ZoomSize) * value);
-                CurrentImage = newImage;
                 _zoomSize = value;
+                //Texture2D newImage = new Texture2D(CurrentImage.width, CurrentImage.height);
+                //newImage.SetPixels(CurrentImage.GetPixels());
+                //TextureScale.Point(newImage, (CurrentImage.width / ZoomSize) * value, (CurrentImage.height / ZoomSize) * value);
+                try
+                {
+                    Texture2D newImage = Zoom(_zoomSize);
+                    CurrentImage = newImage;
+                }
+                catch (Exception ex)
+                {
+                    Debug.Log(ex.ToString());
+                }
             }
         }
     }
@@ -247,8 +287,16 @@ public class ImageEditorWindow : EditorWindow {
     private void OnEnable()
     {
         //initialize array
-        imageDataSize = 1000;
-        ImageData = new Color[imageDataSize, imageDataSize];
+        //imageDataSize = 1000;
+        Debug.Log(ImageSize);
+        ImageData = new Stroke[ImageSize, ImageSize];
+        for (int x = 0; x < ImageSize; x++)
+        {
+            for (int y = 0; y < ImageSize; y++)
+            {
+                ImageData[x, y] = new Stroke(Clone(Eraser), 1);
+            }
+        }
 
         LoadIcons();
         Eraser = new Color(.85f, .85f, .85f, 0);
@@ -285,7 +333,7 @@ public class ImageEditorWindow : EditorWindow {
         //    Debug.Log(Scale);
         //}
 
-        ZoomSize = EditorGUILayout.IntSlider(ZoomSize, 1, 10);
+        ZoomSize = EditorGUILayout.IntSlider(ZoomSize, 1, 25);
         ImageSize = EditorGUILayout.IntField("Image Size: ", ImageSize % 2 == 0 ? ImageSize : 0);
         BrushSize = EditorGUILayout.IntField("Brush Size: ", BrushSize);
 
@@ -494,14 +542,22 @@ public class ImageEditorWindow : EditorWindow {
     {
         Debug.Log(PaletteList.ToString());
         //Debug.Log(NewPaletteColor);
+        ImageData = new Stroke[ImageSize, ImageSize];
+        for (int x = 0; x < ImageSize; x++)
+        {
+            for (int y = 0; y < ImageSize; y++)
+            {
+                ImageData[x, y] = new Stroke(Clone(Eraser), 1);
+            }
+        }
         NewPaletteColor = new ColorChange(CurrentColor, CurrentColor);
-        ZoomSize = 4;
+        ZoomSize = 10;
         //ColorPalette.Clear();
         //PaletteVerifier.Clear();
         CurrentColor = new Color(0, 0, 0, 1);
         //ColorPalette.Add(Clone(CurrentColor));
-        ImageSize = 64;
-        BrushSize = 4;
+        ImageSize = 8;
+        BrushSize = 1;
         UpdateImageSize(new Texture2D(ImageSize * ZoomSize, ImageSize * ZoomSize));
         //PaintPixels(0, 0, CurrentImage.height, CurrentImage.width, CurrentImage, Color.red);
         try
@@ -908,6 +964,42 @@ public class ImageEditorWindow : EditorWindow {
         }
     }
 
+    private Texture2D Zoom(int zoomSize)//The y axis is off
+    {
+        //Get unzoomedSize
+        int size = ImageSize;
+
+        //Update size with zoom
+        size = zoomSize * size;
+
+        //Create new Image at correct size
+        Texture2D zoomedImage = new Texture2D(size, size);
+        Debug.Log("ImageSize: " + ImageSize + " DataSize: " + ImageData.GetLength(0));
+        //Fill new image with correct colors
+        int tempX = 0;
+        int tempY = 0;
+        for (int x = 0; x < size; x+=zoomSize)
+        {
+            for (int y = 0; y < size; y+=zoomSize)
+            {
+                //zoomedImage.SetPixel(x, y, ImageData[x,y].CurrentColor);
+                Stroke s = ImageData[x/zoomSize, y/zoomSize];
+                //Debug.Log(s);
+                for (int i = 0; i < zoomSize; i++)
+                {
+                    tempX = x + i;
+                    for (int j = 0; j < zoomSize; j++)
+                    {
+                        tempY = y + j;
+                        zoomedImage.SetPixel(tempX, zoomedImage.height - tempY, s.CurrentColor);
+                    }
+                }
+            }
+        }
+        zoomedImage.Apply();
+        return zoomedImage;
+    }
+
     #region UpdateImageSize
     private void UpdateImageSize(bool keepExistingImage = false)
     {
@@ -952,21 +1044,20 @@ public class ImageEditorWindow : EditorWindow {
         int row = 0;
         try
         {
-            col = (int)(pos.x / ZoomSize);
-            row = (int)(pos.y / ZoomSize);
+            col = (int)(pos.y / ZoomSize);
+            row = (int)(pos.x / ZoomSize);
 
             for (int x = 0; x < BrushSize; x++)
             {
-                for (int y = 0; y < BrushSize; y ++)
+                for (int y = 0; y < BrushSize; y++)
                 {
-                    ImageData[row + y, col + x] = Clone(color);
-                    //Debug.Log(String.Format("row: {1} col: {0}", col + x, row + y));
+                    ImageData[row + x, col + y] = new Stroke(Clone(color), BrushSize);
                 }
             }            
         }
         catch (Exception ex)
         {
-            //Debug.Log("pos: " + pos + " col: " + col + " row: " + row + " color: " + color + " size: " + ImageData.Length + " error: " + ex.ToString());
+            Debug.Log("pos: " + pos + " col: " + col + " row: " + row + " color: " + color + " size: " + ImageData.Length + " error: " + ex.ToString());
         }
     }
 
@@ -1265,6 +1356,24 @@ public class PaletteTracker : Collection<PaletteEntry>
         }
 
         return temp;
+    }
+}
+
+public class Stroke
+{
+    public Color CurrentColor;
+    public int Size;
+
+    public Stroke()
+    {
+        CurrentColor = Color.black;
+        Size = 1;
+    }
+
+    public Stroke(Color color, int size)
+    {
+        CurrentColor = color;
+        Size = size;
     }
 }
 
