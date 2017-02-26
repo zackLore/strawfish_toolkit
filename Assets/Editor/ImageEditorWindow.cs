@@ -23,6 +23,9 @@ using VNKit;
 //      use a large array to keep track of color positions so that if 
 //      the image scales up there does not need to be another array
 //      created and the image data will persist between zooms.
+//      --DONE
+//          Update palatte tracker to work with new coords
+//      --DONE
 // 2. Preview Windows
 // 3. Import Image
 // =====================
@@ -278,11 +281,11 @@ public class ImageEditorWindow : EditorWindow {
     int adjustedSize = 0;
     int heightGrowthBuffer = 0;
     int positionBuffer = 170;
-    int widthGrowthBuffer = 0;
-    float xCorrect = 1f;
-    float yCorrect = 10f;
+    //int widthGrowthBuffer = 0;
+    //float xCorrect = 1f;
+    //float yCorrect = 10f;
 
-    private int imageDataSize;
+//    private int imageDataSize;
 
     private void OnEnable()
     {
@@ -325,14 +328,6 @@ public class ImageEditorWindow : EditorWindow {
     {
         heightGrowthBuffer = 0;
 
-        //if (GUILayout.Button("Zoom"))
-        //{
-        //    Scale += new Vector2(20f, -1f);
-        //    //GUIUtility.ScaleAroundPivot(Scale, new Vector2(window.position.width, window.position.height));
-        //    //GUIUtility.ScaleAroundPivot(new Vector2(Screen.width / 1440.0f, Screen.height / 900.0f), new Vector2(0.0f, 0.0f));
-        //    Debug.Log(Scale);
-        //}
-
         ZoomSize = EditorGUILayout.IntSlider(ZoomSize, 1, 25);
         ImageSize = EditorGUILayout.IntField("Image Size: ", ImageSize % 2 == 0 ? ImageSize : 0);
         BrushSize = EditorGUILayout.IntField("Brush Size: ", BrushSize);
@@ -343,7 +338,7 @@ public class ImageEditorWindow : EditorWindow {
         
         AddColorButtons(Palette.DefaultColors);
 
-        ShowPalette = EditorGUILayout.Foldout(ShowPalette, "Color Palette (" + PaletteList.Entries.Count + ")", true);
+        ShowPalette = EditorGUILayout.Foldout(ShowPalette, "Color Palette (" + PaletteList.Entries.Count() + ")", true);
         if (ShowPalette)
         {
             AddPaletteTrackerButtons(PaletteList.GetColors());
@@ -407,7 +402,6 @@ public class ImageEditorWindow : EditorWindow {
         {            
             if (!PaletteList.Contains(CurrentColor))
             {
-                //Debug.Log("Adding Color: " + CurrentColor + " pos: " + MousePos);
                 if (!CurrentColor.SameColor(Eraser))
                 {
                     PaletteList.Entries.Add(new PaletteEntry(Clone(CurrentColor)));
@@ -418,16 +412,25 @@ public class ImageEditorWindow : EditorWindow {
 
             try
             {
-                PaletteEntry entry = PaletteList.Entries[CurrentPaletteIndex];
-                if (entry != null)
+                if (CurrentPaletteIndex >= 0)
                 {
-                    //entry.Strokes.Add(new Vector2(MousePos.x, MousePos.y));
-                    entry.AddEntry(new Vector2(MousePos.x, MousePos.y), BrushSize);
-                }
-                else
-                {
-                    Debug.Log("Null entry: " + CurrentPaletteIndex);
-                    Debug.Log(PaletteList.ToString());
+                    PaletteEntry entry = PaletteList.Entries[CurrentPaletteIndex];
+                    if (entry != null)
+                    {
+                        if (CurrentColor.SameColor(Eraser))
+                        {
+                            PaletteList.RemoveEntriesByCoord(GetCoord(MousePos));//clear out all colors at those coords
+                        }
+                        else
+                        {
+                            entry.AddEntry(new Entry(GetCoord(MousePos), new Stroke(Clone(CurrentColor), BrushSize)));
+                        }
+                    }
+                    else
+                    {
+                        Debug.Log("Null entry: " + CurrentPaletteIndex);
+                        Debug.Log(PaletteList.ToString());
+                    }
                 }
             }
             catch (Exception ex)
@@ -436,7 +439,7 @@ public class ImageEditorWindow : EditorWindow {
             }
 
             DrawPixels(previewCoord);
-            AddCoord(previewCoord, CurrentColor);
+            AddCoord(previewCoord, CurrentColor, true);//Add to image data
             CurrentImage.Apply();
         }
 
@@ -455,6 +458,12 @@ public class ImageEditorWindow : EditorWindow {
         }
         
         Repaint();
+        //Check for empty entries
+        PaletteList.UpdateEntries();
+        if (PaletteList.Entries.Count <= 0)
+        {
+            CurrentPaletteIndex = -1;
+        }
     }
 
     public void AddColorButtons(List<Color> colors)
@@ -540,8 +549,6 @@ public class ImageEditorWindow : EditorWindow {
 
     public void ClearValues()
     {
-        Debug.Log(PaletteList.ToString());
-        //Debug.Log(NewPaletteColor);
         ImageData = new Stroke[ImageSize, ImageSize];
         for (int x = 0; x < ImageSize; x++)
         {
@@ -552,18 +559,12 @@ public class ImageEditorWindow : EditorWindow {
         }
         NewPaletteColor = new ColorChange(CurrentColor, CurrentColor);
         ZoomSize = 10;
-        //ColorPalette.Clear();
-        //PaletteVerifier.Clear();
         CurrentColor = new Color(0, 0, 0, 1);
-        //ColorPalette.Add(Clone(CurrentColor));
         ImageSize = 8;
         BrushSize = 1;
         UpdateImageSize(new Texture2D(ImageSize * ZoomSize, ImageSize * ZoomSize));
-        //PaintPixels(0, 0, CurrentImage.height, CurrentImage.width, CurrentImage, Color.red);
         try
         {
-            //Debug.Log("Painting...");
-            //PaintPixels(CurrentImage, new Color(1,1,1,0));
             PaintPixels(CurrentImage, Eraser);
             Repaint();
         }
@@ -576,15 +577,11 @@ public class ImageEditorWindow : EditorWindow {
         UpdatingColor = false;
         PaletteColorChanged = false;
 
-        //Debug.Log(PaletteList.ToString());
-
         Palette = new ColorPalette();
         PaletteList = new PaletteTracker();
-        //PaletteList.Entries.Add(new PaletteEntry(CurrentColor));
         CurrentPaletteIndex = 0;
 
         PaletteButtonTextures = new List<Texture2D>();
-        //AddPaletteButtonTexture(CurrentPaletteIndex);
 
         InitButtonTextures(Palette.DefaultColors);
         Scale = Vector2.one;
@@ -616,6 +613,33 @@ public class ImageEditorWindow : EditorWindow {
                 }
             }
         }
+    }
+
+    //Used in redraw of color in palettes
+    private void DrawPixels(Vector2 coord, Color color, int brushSize)
+    {        
+        int x = (int)coord.x * ZoomSize;
+        int y = (int)coord.y * ZoomSize;
+
+        int row = 0;
+        int col = y;
+
+        int fullSize = brushSize * ZoomSize;
+
+        for (int i = 0; i < fullSize; i++)
+        {
+            row = x + i;
+            for (int j = 0; j < fullSize; j++)
+            {
+                col = CurrentImage.height - 1 - y - j;
+                if (row < CurrentImage.width && row >= 0 &&
+                    col < CurrentImage.height && col >= 0)
+                {
+                    CurrentImage.SetPixel(row, col, color);
+                }
+            }
+        }
+
     }
 
     private void DrawPixels(Vector3 pos, Color color, int size)
@@ -863,42 +887,50 @@ public class ImageEditorWindow : EditorWindow {
 
     private void UpdatePalette(int index)
     {
-        //PaletteEntry p = PaletteList.Entries.ElementAt(index);
-        //Debug.Log(p);
-        //Debug.Log("Stroke Count: " + p.Strokes.Count);
-        //foreach (var pos in p.Strokes)
-        for (int j=0; j<PaletteList.Entries.Count; j++)
+        Debug.Log("index: " + index + " PaletteList.Entries.Count: " + PaletteList.Entries.Count);
+        try
         {
-            PaletteEntry p = PaletteList.Entries.ElementAt(j);
-            for (int i = 0; i < p.Strokes.Count; i++)
+            for (int j = 0; j < PaletteList.Entries.Count; j++)
             {
-                var pos = p.Strokes[i];
-                Vector3 adj = new Vector2(pos.x - this.position.x - ImageArea.position.x,
-                                 pos.y - this.position.y - ImageArea.position.y);
+                PaletteEntry p = PaletteList.Entries.ElementAt(j);
+                foreach(var e in p.Entries)
+                {
+                    //Vector3 adj = new Vector2(pos.x - this.position.x - ImageArea.position.x,
+                    //                 pos.y - this.position.y - ImageArea.position.y);
 
-                //Used to calculate the square to draw on the image
-                Vector2 previewCoord = FindCoord(adj);
-                //Debug.Log(previewCoord + " | " + pos);
-                DrawPixels(previewCoord, j==index ? NewPaletteColor.NewColor : p.CurrentColor, p.BrushSizes[i] * ZoomSize);
+                    ////Used to calculate the square to draw on the image
+                    //Vector2 previewCoord = FindCoord(adj);
+
+                    //DrawPixels(previewCoord, j==index ? NewPaletteColor.NewColor : p.CurrentColor, p.BrushSizes[i] * ZoomSize);
+                    DrawPixels(e.Coord , j == index ? NewPaletteColor.NewColor : p.CurrentColor, e.CurrentStroke.Size);
+
+                    //UpdateImageData
+                    ImageData[(int)e.Coord.x, (int)e.Coord.y].CurrentColor = j == index ? NewPaletteColor.NewColor : p.CurrentColor;
+                }
             }
+
+            //SAVE
+            //Puts color on top of the image
+            //for(int i=0; i < p.Strokes.Count; i++)
+            //{
+            //    var pos = p.Strokes[i];
+            //    Vector3 adj = new Vector2(pos.x - this.position.x - ImageArea.position.x,
+            //                     pos.y - this.position.y - ImageArea.position.y);
+
+            //    //Used to calculate the square to draw on the image
+            //    Vector2 previewCoord = FindCoord(adj);
+            //    //Debug.Log(previewCoord + " | " + pos);
+            //    DrawPixels(previewCoord, NewPaletteColor.NewColor, p.BrushSizes[i] * ZoomSize);            
+            //}
+
+            PaletteList.Entries.ElementAt(index).CurrentColor = Clone(NewPaletteColor.NewColor);
+            UpdatePaletteButtonTexture(index);
+            NewPaletteColor = new ColorChange(CurrentColor, CurrentColor);
         }
-
-        //Puts color on top of the image
-        //for(int i=0; i < p.Strokes.Count; i++)
-        //{
-        //    var pos = p.Strokes[i];
-        //    Vector3 adj = new Vector2(pos.x - this.position.x - ImageArea.position.x,
-        //                     pos.y - this.position.y - ImageArea.position.y);
-
-        //    //Used to calculate the square to draw on the image
-        //    Vector2 previewCoord = FindCoord(adj);
-        //    //Debug.Log(previewCoord + " | " + pos);
-        //    DrawPixels(previewCoord, NewPaletteColor.NewColor, p.BrushSizes[i] * ZoomSize);            
-        //}
-
-        PaletteList.Entries.ElementAt(index).CurrentColor = Clone(NewPaletteColor.NewColor);
-        UpdatePaletteButtonTexture(index);
-        NewPaletteColor = new ColorChange(CurrentColor, CurrentColor);
+        catch (Exception ex)
+        {
+            Debug.Log(ex.ToString());
+        }
     }
 
     //not in use
@@ -974,7 +1006,6 @@ public class ImageEditorWindow : EditorWindow {
 
         //Create new Image at correct size
         Texture2D zoomedImage = new Texture2D(size, size);
-        Debug.Log("ImageSize: " + ImageSize + " DataSize: " + ImageData.GetLength(0));
         //Fill new image with correct colors
         int tempX = 0;
         int tempY = 0;
@@ -982,16 +1013,15 @@ public class ImageEditorWindow : EditorWindow {
         {
             for (int y = 0; y < size; y+=zoomSize)
             {
-                //zoomedImage.SetPixel(x, y, ImageData[x,y].CurrentColor);
                 Stroke s = ImageData[x/zoomSize, y/zoomSize];
-                //Debug.Log(s);
                 for (int i = 0; i < zoomSize; i++)
                 {
                     tempX = x + i;
                     for (int j = 0; j < zoomSize; j++)
                     {
                         tempY = y + j;
-                        zoomedImage.SetPixel(tempX, zoomedImage.height - tempY, s.CurrentColor);
+                        tempY = (zoomedImage.height - 1) - tempY;
+                        zoomedImage.SetPixel(tempX, tempY, s.CurrentColor);
                     }
                 }
             }
@@ -1038,14 +1068,17 @@ public class ImageEditorWindow : EditorWindow {
         return new Color(color.r, color.g, color.b, color.a);
     }
 
-    public void AddCoord(Vector2 pos, Color color)
+    public void AddCoord(Vector2 pos, Color color, bool isAdjustedPosition)
     {
         int col = 0;
         int row = 0;
         try
         {
-            col = (int)(pos.y / ZoomSize);
-            row = (int)(pos.x / ZoomSize);
+            var temp = GetCoord(pos, isAdjustedPosition);
+            col = (int)temp.y;
+            row = (int)temp.x;
+            //col = (int)(pos.y / ZoomSize);
+            //row = (int)(pos.x / ZoomSize);
 
             for (int x = 0; x < BrushSize; x++)
             {
@@ -1059,6 +1092,35 @@ public class ImageEditorWindow : EditorWindow {
         {
             Debug.Log("pos: " + pos + " col: " + col + " row: " + row + " color: " + color + " size: " + ImageData.Length + " error: " + ex.ToString());
         }
+    }
+
+    public Vector2 GetCoord(Vector2 pos, bool adjustedPosition = false)
+    {
+        Vector2 coord = Vector2.zero;
+        int col = 0;
+        int row = 0;
+        try
+        {
+            if (adjustedPosition)
+            {
+                col = (int)(pos.y / ZoomSize);
+                row = (int)(pos.x / ZoomSize);
+                coord = new Vector2(row, col);
+            }
+            else
+            {
+                Vector3 adj = new Vector2(  pos.x - this.position.x - ImageArea.position.x,
+                                            pos.y - this.position.y - ImageArea.position.y  );
+                col = (int)(adj.y / ZoomSize);
+                row = (int)(adj.x / ZoomSize);
+                coord = new Vector2(row, col);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.Log("pos: " + pos + " col: " + col + " row: " + row + " error: " + ex.ToString());
+        }
+        return coord;
     }
 
     // ========================================================================================
@@ -1226,33 +1288,58 @@ public class ColorPalette
     }
 }
 
+public class Entry
+{
+    public Vector2 Coord;
+    public Stroke CurrentStroke;
+
+    public Entry()
+    {
+    }
+
+    public Entry(Vector2 coord, Stroke stroke)
+    {
+        Coord = coord;
+        CurrentStroke = stroke;
+    }
+
+    public bool Has(Vector2 coord)
+    {
+        return coord.x == Coord.x && coord.y == Coord.y;
+    }
+}
+
 public class PaletteEntry
 {
     public Color CurrentColor;
-    public List<Vector2> Strokes;
+    public HashSet<Entry> Entries;
+    public List<Vector2> Positions;
     public List<int> BrushSizes;
 
     #region PaletteEntry
     public PaletteEntry()
     {
         CurrentColor = Color.black;
-        Strokes = new List<Vector2>();
+        Entries = new HashSet<Entry>();
+        Positions = new List<Vector2>();
         BrushSizes = new List<int>();
     }
 
     public PaletteEntry(Color color)
     {
         CurrentColor = color;
-        Strokes = new List<Vector2>();
+        Entries = new HashSet<Entry>();
+        Positions = new List<Vector2>();
         BrushSizes = new List<int>();
     }
 
     public PaletteEntry(Color color, List<Vector2> positions)
     {
         CurrentColor = color;
-        Strokes = positions;
+        Entries = new HashSet<Entry>();
+        Positions = positions;
         BrushSizes = new List<int>();
-        foreach (var s in Strokes)
+        foreach (var s in Positions)
         {
             BrushSizes.Add(1);
         }
@@ -1261,19 +1348,38 @@ public class PaletteEntry
     public PaletteEntry(List<Vector2> positions)
     {
         CurrentColor = Color.black;
-        Strokes = positions;
+        Entries = new HashSet<Entry>();
+        Positions = positions;
         BrushSizes = new List<int>();
-        foreach (var s in Strokes)
+        foreach (var s in Positions)
         {
             BrushSizes.Add(1);
         }
     }
     #endregion PaletteEntry
 
+    public void AddEntry(Entry entry)
+    {
+        Entries.Add(entry);
+    }
+
     public void AddEntry(Vector2 stroke, int size)
     {
-        Strokes.Add(stroke);
-        BrushSizes.Add(size);
+        for (int x = 0; x < size; x++)
+        {
+            for (int y = 0; y < size; y++)
+            {
+                var temp = new Vector2(stroke.x + x, stroke.y + y);
+                Positions.Add(temp);
+            }
+        }
+        //Strokes.Add(stroke);
+        //BrushSizes.Add(size);
+    }
+
+    public void RemoveEntry(Vector2 coord)
+    {
+        Entries.RemoveWhere(x => x.Has(coord));
     }
 
     public override string ToString()
@@ -1284,7 +1390,7 @@ public class PaletteEntry
         temp += "color: " + CurrentColor.ToString();
         temp += " -> " + Environment.NewLine;
 
-        foreach (var s in Strokes)
+        foreach (var s in Positions)
         {
             temp += "  " + s.ToString();
         }
@@ -1319,10 +1425,15 @@ public class PaletteTracker : Collection<PaletteEntry>
     public List<Color> GetColors()
     {
         List<Color> colors = new List<Color>();
+
         foreach (var e in Entries)
         {
-            colors.Add(e.CurrentColor);
-        }
+            if (e.Entries.Count > 0)
+            {
+                colors.Add(e.CurrentColor);
+            }  
+        }        
+
         return colors;
     }
 
@@ -1343,6 +1454,42 @@ public class PaletteTracker : Collection<PaletteEntry>
         }
 
         return index;
+    }
+
+    public void RemoveEntries(List<PaletteEntry> pes)
+    {
+        for (int i = pes.Count - 1; i >= 0; i--)
+        {
+            Entries.Remove(pes[i]);
+        }
+    }
+
+    public void RemoveEntriesByCoord(Vector2 coord)
+    {
+        List<Entry> toRemove = new List<Entry>();
+        
+        foreach (var p in Entries)
+        {
+            p.Entries.RemoveWhere(x => x.Has(coord));
+        }
+    }
+
+    public void UpdateEntries()
+    {
+        List<PaletteEntry> removals = new List<PaletteEntry>();
+
+        foreach (var e in Entries)
+        {
+            if (e.Entries.Count <= 0)
+            {
+                removals.Add(e);//entry no longer has any strokes
+            }
+        }
+
+        if (removals.Count > 0)
+        {
+            RemoveEntries(removals);
+        }
     }
 
     public override string ToString()
@@ -1382,39 +1529,12 @@ public class Stroke
 // ================================================================
 public static class Extensions
 {
-    public static bool SameColor(this Color c1, Color c2)//Needs to correctly convert from float to int (0-255)
+    public static bool SameColor(this Color c1, Color c2)
     {
-        //Color32 color1 = new Color32(c1.r, c1.g, c1.b, c1.a);
-        //Color32 color2 = new Color32(c2.r, c2.g, c2.b, c2.a);
-
-        //Debug.Log(Mathf.Round(c1.r * 1000f) + " -> " + Mathf.Round(c1.r * 1000f) / 1000f);
-        //Debug.Log(Mathf.RoundToInt(c1.r * 10f) + " --> " + Mathf.RoundToInt(c1.r * 10f) / 10f);
-        //Debug.Log(c1.r / 255 + " ---> " + c2.r / 255);
-        //if (Mathf.RoundToInt(c1.r * 1000f) == Mathf.RoundToInt(c2.r * 1000f) &&
-        //    Mathf.RoundToInt(c1.g * 1000f) == Mathf.RoundToInt(c2.g * 1000f) &&
-        //    Mathf.RoundToInt(c1.b * 1000f) == Mathf.RoundToInt(c2.b * 1000f) &&
-        //    Mathf.RoundToInt(c1.a * 1000f) == Mathf.RoundToInt(c2.a * 1000f))
-        //if (Mathf.Round(c1.r * 100f) / 100f == Mathf.Round(c2.r * 100f) / 100f &&
-        //    Mathf.Round(c1.g * 100f) / 100f == Mathf.Round(c2.g * 100f) / 100f &&
-        //    Mathf.Round(c1.b * 100f) / 100f == Mathf.Round(c2.b * 100f) / 100f &&
-        //    Mathf.Round(c1.a * 100f) / 100f == Mathf.Round(c2.a * 100f) / 100f)
-        //if (Mathf.Round(c1.r * 10f) / 10f == Mathf.Round(c2.r * 10f) / 10f &&
-        //    Mathf.Round(c1.g * 10f) / 10f == Mathf.Round(c2.g * 10f) / 10f &&
-        //    Mathf.Round(c1.b * 10f) / 10f == Mathf.Round(c2.b * 10f) / 10f &&
-        //    Mathf.Round(c1.a * 10f) / 10f == Mathf.Round(c2.a * 10f) / 10f)
-        //if (Mathf.Round(c1.r) == Mathf.Round(c2.r) &&
-        //    Mathf.Round(c1.g) == Mathf.Round(c2.g) &&
-        //    Mathf.Round(c1.b) == Mathf.Round(c2.b) &&
-        //    Mathf.Round(c1.a) == Mathf.Round(c2.a) )
         if (c1.r / 255f == c2.r / 255f &&
             c1.g / 255f == c2.g / 255f &&
             c1.b / 255f == c2.b / 255f &&
             c1.a / 255f == c2.a / 255f)
-
-        //if (c1.r * 255 == c2.r * 255 &&
-        //    c1.g * 255 == c2.g * 255 &&
-        //    c1.b * 255 == c2.b * 255 &&
-        //    c1.a * 255 == c2.a * 255 )
         {
             return true;
         }
