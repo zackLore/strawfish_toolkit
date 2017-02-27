@@ -11,6 +11,7 @@ using System.IO;
 using System.Collections.ObjectModel;
 using VNKit;
 
+#region Notes
 // =====================
 // To Do
 // =====================
@@ -28,7 +29,17 @@ using VNKit;
 //      --DONE
 // 2. Preview Windows
 // 3. Import Image
+// 4. Misc Fixes: 
+//      Paint bucket option to paint background of foreground
+//      Option to overlap the colors on color change
+//      Undo
+//      Fix Palette Tracker when colors are removed
+//      Mirroring
+//      Shapes (lines, circles, squares, etc)
+//      Fill
+//      Locking columns or rows from editing
 // =====================
+#endregion Notes
 
 public class ImageEditorWindow : EditorWindow {
     [MenuItem("Window/ Image Editor")]
@@ -338,7 +349,7 @@ public class ImageEditorWindow : EditorWindow {
         
         AddColorButtons(Palette.DefaultColors);
 
-        ShowPalette = EditorGUILayout.Foldout(ShowPalette, "Color Palette (" + PaletteList.Entries.Count() + ")", true);
+        ShowPalette = EditorGUILayout.Foldout(ShowPalette, "Palette Tracker (" + PaletteList.Entries.Count() + ")", true);
         if (ShowPalette)
         {
             AddPaletteTrackerButtons(PaletteList.GetColors());
@@ -441,6 +452,7 @@ public class ImageEditorWindow : EditorWindow {
             DrawPixels(previewCoord);
             AddCoord(previewCoord, CurrentColor, true);//Add to image data
             CurrentImage.Apply();
+            PreviewWindow.RefreshNeeded = true;
         }
 
         if (NewPaletteColor.Changed)
@@ -464,6 +476,8 @@ public class ImageEditorWindow : EditorWindow {
         {
             CurrentPaletteIndex = -1;
         }
+        //UpdatePreviews if they exist
+        UpdatePreviews();
     }
 
     public void AddColorButtons(List<Color> colors)
@@ -885,6 +899,18 @@ public class ImageEditorWindow : EditorWindow {
         System.Diagnostics.Process.Start(imagePath);        
     }
 
+    private void UpdateBrush()
+    {
+        if (ImageArea.Overlaps(BrushRect))
+        {
+            Cursor.visible = false;
+        }
+        else
+        {
+            Cursor.visible = true;
+        }
+    }
+
     private void UpdatePalette(int index)
     {
         Debug.Log("index: " + index + " PaletteList.Entries.Count: " + PaletteList.Entries.Count);
@@ -984,15 +1010,16 @@ public class ImageEditorWindow : EditorWindow {
         ButtonTexture.Apply();
     }
 
-    private void UpdateBrush()
+    public void UpdatePreviews()
     {
-        if (ImageArea.Overlaps(BrushRect))
+        try
         {
-            Cursor.visible = false;
+            PreviewWindow.ImageData_ = ImageData;
+            PreviewWindow.PreviewTracker_ = PaletteList;
         }
-        else
+        catch (Exception ex)
         {
-            Cursor.visible = true;
+            Debug.Log("Update Previews Failed: " + ex.ToString());
         }
     }
 
